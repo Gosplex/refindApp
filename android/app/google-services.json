@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "753564717002",
+    "project_id": "myrefindapp",
+    "storage_bucket": "myrefindapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753564717002:android:e3f77aab23114140e0c933",
+        "android_client_info": {
+          "package_name": "com.app.refind"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753564717002-llo0qetd860aqpfhg1kf67cgmhbago03.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.app.refind",
+            "certificate_hash": "7008419730ab60be2c84e4a4dc110f7f01cb0c62"
+          }
+        },
+        {
+          "client_id": "753564717002-vlvo3p5hulj67ek1nnqh0n03lrgbet2e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDt8BuwN5Icn5LLU7RYbXCniu1TyN5QLQM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753564717002-vlvo3p5hulj67ek1nnqh0n03lrgbet2e.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "753564717002-6mb8frqnu5dla1idhqq4rc8r2memecb5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.refindApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
