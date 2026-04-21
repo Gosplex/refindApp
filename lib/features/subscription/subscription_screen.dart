@@ -32,6 +32,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return NumberFormat.simpleCurrency(locale: locale,);
   }
 
+  String get currencySymbol {
+    final package = _yearly ?? _monthly;
+
+    if (package == null) return '';
+
+    return package.storeProduct.priceString
+        .replaceAll(RegExp(r'[0-9.,\s]'), '');
+  }
+
   final auth = AuthService();
 
 
@@ -333,12 +342,14 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           Expanded(
                             child: _PlanCard(
                               title: 'Free',
-                              price: _currencyFormatter(context).format(0),
+                              price: '${currencySymbol}0',
+                              // price: _currencyFormatter(context).format(0),
                               period: 'forever',
                               isActive: !isPro,
                               isDark: isDark,
                               features: const [
                                 '20 bookmarks',
+                                '3 collections',
                                 'Smart reminders',
                               ],
                             ),
@@ -351,10 +362,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               period: _displayPeriod,
                               perMonthNote: _isYearly ? _perMonthNote : null,
                               highlight: true,
-                              isActive: isPro, // ✅ Premium active if pro
+                              isActive: isPro,
                               isDark: isDark,
                               features: const [
                                 'Unlimited bookmarks',
+                                'Unlimited collections',
                                 'Smart reminders',
                                 'Default reminder',
                                 'Stop reminding after',
@@ -713,6 +725,7 @@ class _FeatureList extends StatelessWidget {
 
   static const _features = [
     (title: 'Unlimited bookmarks', subtitle: 'Save as many links as you want, forever'),
+    (title: 'Unlimited collections', subtitle: 'Create as many collections as possible, forever'),
     (title: 'Smart reminders',      subtitle: 'Get nudged to revisit links at the right time'),
     (title: 'Advanced controls',    subtitle: 'Default intervals, stop-after rules & quiet hours'),
   ];

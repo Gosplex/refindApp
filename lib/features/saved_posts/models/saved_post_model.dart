@@ -9,6 +9,8 @@ class SavedPost {
   final String? domain;
   final List<String>? tags;
 
+  final String? collectionId;
+
   final int reminderCount;
   final bool isDismissed;
   final DateTime? lastRemindedAt;
@@ -24,12 +26,16 @@ class SavedPost {
     this.source,
     this.domain,
     this.tags,
+    this.collectionId, // ✅ added
     this.reminderCount = 0,
     this.isDismissed = false,
     this.lastRemindedAt,
     required this.createdAt,
   });
 
+  /// ─────────────────────────────────────────────
+  /// 📤 To Firestore
+  /// ─────────────────────────────────────────────
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -40,6 +46,7 @@ class SavedPost {
       'source': source,
       'domain': domain,
       'tags': tags,
+      'collectionId': collectionId, // ✅ added
       'reminderCount': reminderCount,
       'isDismissed': isDismissed,
       'lastRemindedAt': lastRemindedAt?.toIso8601String(),
@@ -47,6 +54,9 @@ class SavedPost {
     };
   }
 
+  /// ─────────────────────────────────────────────
+  /// 📥 From Firestore
+  /// ─────────────────────────────────────────────
   factory SavedPost.fromMap(Map<String, dynamic> map) {
     return SavedPost(
       id: map['id'],
@@ -57,12 +67,49 @@ class SavedPost {
       source: map['source'],
       domain: map['domain'],
       tags: map['tags'] != null ? List<String>.from(map['tags']) : null,
+
+      /// ✅ safe read (backward compatible)
+      collectionId: map['collectionId'],
+
       reminderCount: map['reminderCount'] ?? 0,
       isDismissed: map['isDismissed'] ?? false,
       lastRemindedAt: map['lastRemindedAt'] != null
           ? DateTime.parse(map['lastRemindedAt'])
           : null,
       createdAt: DateTime.parse(map['createdAt']),
+    );
+  }
+
+  /// ─────────────────────────────────────────────
+  /// ✏️ CopyWith (VERY useful later 🔥)
+  /// ─────────────────────────────────────────────
+  SavedPost copyWith({
+    String? title,
+    String? url,
+    String? description,
+    String? image,
+    String? source,
+    String? domain,
+    List<String>? tags,
+    String? collectionId,
+    int? reminderCount,
+    bool? isDismissed,
+    DateTime? lastRemindedAt,
+  }) {
+    return SavedPost(
+      id: id,
+      title: title ?? this.title,
+      url: url ?? this.url,
+      description: description ?? this.description,
+      image: image ?? this.image,
+      source: source ?? this.source,
+      domain: domain ?? this.domain,
+      tags: tags ?? this.tags,
+      collectionId: collectionId ?? this.collectionId,
+      reminderCount: reminderCount ?? this.reminderCount,
+      isDismissed: isDismissed ?? this.isDismissed,
+      lastRemindedAt: lastRemindedAt ?? this.lastRemindedAt,
+      createdAt: createdAt,
     );
   }
 }

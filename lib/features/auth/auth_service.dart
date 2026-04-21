@@ -115,4 +115,5 @@ class AuthService {
     await GoogleSignIn().signOut();
     await _auth.signOut();
   }
+
 }

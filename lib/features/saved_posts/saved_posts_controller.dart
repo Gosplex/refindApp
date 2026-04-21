@@ -9,7 +9,7 @@ class SavedPostsController {
   final SavedPostsService _service = SavedPostsService();
   final Uuid _uuid = const Uuid();
 
-  Future<bool> addPost(String url) async {
+  Future<bool> addPost(String url, {String? collectionId}) async {
     if (url.trim().isEmpty) return false;
 
     final canAdd = await _service.canAddPost();
@@ -21,6 +21,7 @@ class SavedPostsController {
       id: _uuid.v4(),
       title: url,
       url: url,
+      collectionId: collectionId,
       createdAt: DateTime.now(),
     );
 
@@ -51,6 +52,17 @@ class SavedPostsController {
 
   Future<void> markReminderTriggered(String id) async {
     await _service.incrementReminder(id);
+  }
+
+  Future<void> addToCollection({
+    required String postId,
+    required String? collectionId,
+  }) async {
+    await _service.addToCollection(postId, collectionId);
+  }
+
+  Stream<List<SavedPost>> getPostsByCollection(String collectionId) {
+    return _service.getPostsByCollection(collectionId);
   }
 
   Future<void> _fetchAndUpdateMetadata(SavedPost post) async {

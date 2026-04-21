@@ -5,11 +5,13 @@ import 'package:provider/provider.dart';
 import 'package:refind_app/features/subscription/subscription_screen.dart';
 
 import '../../core/theme/colors.dart';
-import '../../core/utils/url_launcher.dart';
 import '../../services/in_app_purchase_service.dart';
+import '../collection/collection_controller.dart';
+import '../collection/models/collection_model.dart';
 import '../limitGuard/usage_provider.dart';
 import '../saved_posts/saved_posts_controller.dart';
 import '../saved_posts/models/saved_post_model.dart';
+import 'link_details_screen.dart';
 import 'widgets/post_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -298,7 +300,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         },
                         onDismiss: () => controller.dismissPost(post.id),
-                        onTap: () => openUrl(post.url),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => LinkDetailScreen(post: post),
+                            ),
+                          );
+                        },
                       );
                     },
                   );
@@ -460,9 +469,14 @@ class _AddPostSheet extends StatefulWidget {
 
 class _AddPostSheetState extends State<_AddPostSheet> {
   final _urlController = TextEditingController();
+
   Metadata? _preview;
   bool _isLoading = false;
   bool _isSaving = false;
+
+  String? _selectedCollectionId;
+
+  final _collectionsController = CollectionsController();
 
   @override
   void initState() {
@@ -481,21 +495,24 @@ class _AddPostSheetState extends State<_AddPostSheet> {
   }
 
   void _showPaywall() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const SubscriptionScreen()));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+    );
   }
 
   Future<void> _fetchPreview(String url) async {
     if (url.length < 10) return;
+
     setState(() {
       _isLoading = true;
       _preview = null;
     });
+
     try {
       final data = await MetadataFetch.extract(url);
       if (mounted) setState(() => _preview = data);
     } catch (_) {}
+
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -505,15 +522,16 @@ class _AddPostSheetState extends State<_AddPostSheet> {
 
     setState(() => _isSaving = true);
 
-    final success = await widget.controller.addPost(url);
+    final success = await widget.controller.addPost(
+      url,
+      collectionId: _selectedCollectionId, // 👈 PASS HERE
+    );
 
     setState(() => _isSaving = false);
 
     if (!success) {
       Navigator.pop(context);
-
       _showPaywall();
-
       return;
     }
 
@@ -541,6 +559,8 @@ class _AddPostSheetState extends State<_AddPostSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+
+          /// Handle bar
           Center(
             child: Container(
               width: 36,
@@ -557,12 +577,15 @@ class _AddPostSheetState extends State<_AddPostSheet> {
 
           const SizedBox(height: 16),
 
+          /// URL Input
           TextField(
             controller: _urlController,
             autofocus: true,
             keyboardType: TextInputType.url,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimary,
             ),
             decoration: const InputDecoration(
               hintText: 'Paste link...',
@@ -571,11 +594,13 @@ class _AddPostSheetState extends State<_AddPostSheet> {
             onChanged: _fetchPreview,
           ),
 
+          /// Loading
           if (_isLoading) ...[
             const SizedBox(height: 20),
             const _InlineShimmer(),
           ],
 
+          /// Preview
           if (_preview != null && !_isLoading) ...[
             const SizedBox(height: 16),
             PreviewCard(
@@ -585,8 +610,93 @@ class _AddPostSheetState extends State<_AddPostSheet> {
             ),
           ],
 
+          /// 🔥 COLLECTION SELECTOR (NEW)
+          const SizedBox(height: 16),
+
+          Text(
+            'Select a collection',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+
+          const SizedBox(height: 16),
+
+          StreamBuilder<List<CollectionModel>>(
+            stream: _collectionsController.getCollectionsStream(),
+            builder: (context, snapshot) {
+              final collections = snapshot.data ?? [];
+
+              if (collections.isEmpty) return const SizedBox.shrink();
+
+              // 👇 Auto-select first collection (simple suggestion)
+              _selectedCollectionId ??= collections.first.id;
+
+              return SizedBox(
+                height: 44,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: collections.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final col = collections[index];
+                    final isSelected =
+                        col.id == _selectedCollectionId;
+
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedCollectionId = col.id;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primaryMuted
+                              : (isDark
+                              ? AppColors.surfaceVariantDark
+                              : AppColors.surfaceVariant),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.primary
+                                : borderColor,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.folder_rounded,
+                              size: 16,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.textTertiary,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              col.name,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+
           const SizedBox(height: 24),
 
+          /// Save Button
           SizedBox(
             width: double.infinity,
             height: 50,
@@ -594,13 +704,13 @@ class _AddPostSheetState extends State<_AddPostSheet> {
               onPressed: _isSaving ? null : _save,
               child: _isSaving
                   ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
                   : const Text('Save'),
             ),
           ),

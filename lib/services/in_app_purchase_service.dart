@@ -28,7 +28,7 @@ class InAppPurchaseService {
   Future<void> configureRevenueCat(String appUserId) async {
     if (_configured) return;
 
-    if (kDebugMode) return;
+    // if (kDebugMode) return;
 
     await Purchases.setLogLevel(LogLevel.debug);
 
@@ -128,9 +128,10 @@ class InAppPurchaseService {
 
     await _firestore.collection("users").doc(user.uid).set({
       "isPro": isPro,
+      "plan": isPro ? "premium" : "free",
       "entitlements": _customerInfo?.entitlements.all.keys.toList() ?? [],
-      "lastUpdated": FieldValue.serverTimestamp(),
       "rcAppUserId": _customerInfo?.originalAppUserId,
+      "lastSeen": FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 

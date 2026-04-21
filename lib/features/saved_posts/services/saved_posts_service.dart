@@ -105,6 +105,31 @@ class SavedPostsService {
     await batch.commit();
   }
 
+  Future<void> addToCollection(String postId, String? collectionId) async {
+    await _postsRef.doc(postId).update({
+      'collectionId': collectionId,
+    });
+  }
+
+  Stream<List<SavedPost>> getPostsByCollection(String collectionId) {
+    return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
+      if (user == null) return Stream.value([]);
+
+      return FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('posts')
+          .where('collectionId', isEqualTo: collectionId)
+          .orderBy('createdAt', descending: true)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => SavedPost.fromMap(doc.data()))
+            .toList();
+      });
+    });
+  }
+
   DocumentReference get _userRef =>
       _firestore.collection('users').doc(userId);
 }

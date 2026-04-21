@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "753564717002-dqmnqp34j8ovs6d1eht4d837slf3tgri.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.app.refind",
+            "certificate_hash": "3c3ef7347c56f819ef7f106761dd9fd0000b1f4d"
+          }
+        },
+        {
           "client_id": "753564717002-llo0qetd860aqpfhg1kf67cgmhbago03.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

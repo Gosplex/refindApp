@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 
+import '../../admin/dashboard/admin_dashboard_screen.dart';
 import '../../main.dart';
 import '../../navigation/bottom_nav.dart';
 import '../../core/theme/colors.dart';
@@ -49,7 +51,9 @@ class _SplashScreenState extends State<SplashScreen>
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
-    _startApp();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startApp();
+    });
   }
 
   @override
@@ -69,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _openStore() async {
     const url =
-        "https://play.google.com/store/apps/details?id=YOUR_PACKAGE";
+        "https://play.google.com/store/apps/details?id=com.app.refind";
 
     final uri = Uri.parse(url);
 
@@ -79,6 +83,21 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _startApp() async {
+    /// Navigate earlier if web
+    if (kIsWeb) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AdminDashboardScreen(),
+          ),
+        );
+      });
+      return;
+    }
+
     final authController = AuthController();
     final settingsController = SettingsController();
 

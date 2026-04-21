@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -63,9 +60,19 @@ class DefaultFirebaseOptions {
     messagingSenderId: '753564717002',
     projectId: 'myrefindapp',
     storageBucket: 'myrefindapp.firebasestorage.app',
-    androidClientId: '753564717002-llo0qetd860aqpfhg1kf67cgmhbago03.apps.googleusercontent.com',
+    androidClientId: '753564717002-dqmnqp34j8ovs6d1eht4d837slf3tgri.apps.googleusercontent.com',
     iosClientId: '753564717002-6mb8frqnu5dla1idhqq4rc8r2memecb5.apps.googleusercontent.com',
     iosBundleId: 'com.example.refindApp',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDOmdxaBYSLEu0esRbQepToLsKAhdk6KoM',
+    appId: '1:753564717002:web:aaa6a97d0abb43e2e0c933',
+    messagingSenderId: '753564717002',
+    projectId: 'myrefindapp',
+    authDomain: 'myrefindapp.firebaseapp.com',
+    storageBucket: 'myrefindapp.firebasestorage.app',
+    measurementId: 'G-PQBLK8YDDF',
   );
 
 }

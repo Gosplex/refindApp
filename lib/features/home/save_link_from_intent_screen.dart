@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:metadata_fetch/metadata_fetch.dart';
 
+import '../collection/collection_controller.dart';
+import '../collection/models/collection_model.dart';
 import '../saved_posts/saved_posts_controller.dart';
 import '../../core/theme/colors.dart';
 import '../subscription/subscription_screen.dart';
@@ -32,6 +34,9 @@ class _SaveLinkFromIntentScreenState
 
   late final AnimationController _fadeController;
   late final Animation<double>  _fadeAnim;
+
+  String? _selectedCollectionId;
+  final _collectionsController = CollectionsController();
 
   @override
   void initState() {
@@ -81,7 +86,10 @@ class _SaveLinkFromIntentScreenState
     HapticFeedback.lightImpact();
     setState(() => _isSaving = true);
 
-    final success = await controller.addPost(url);
+    final success = await controller.addPost(
+      url,
+      collectionId: _selectedCollectionId,
+    );
 
     setState(() => _isSaving = false);
 
@@ -176,6 +184,92 @@ class _SaveLinkFromIntentScreenState
                   isDark:      isDark,
                   borderColor: borderColor,
                 ),
+              ),
+
+              const SizedBox(height: 16),
+              Text(
+                'Select a collection',
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+
+              const SizedBox(height: 16),
+
+              StreamBuilder<List<CollectionModel>>(
+                stream: _collectionsController.getCollectionsStream(),
+                builder: (context, snapshot) {
+                  final collections = snapshot.data ?? [];
+
+                  if (collections.isEmpty) return const SizedBox.shrink();
+
+                  // 👇 auto-select first
+                  _selectedCollectionId ??= collections.first.id;
+
+                  final isDark = Theme.of(context).brightness == Brightness.dark;
+                  final borderColor = isDark ? AppColors.borderDark : AppColors.border;
+
+                  return SizedBox(
+                    height: 44,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: collections.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final col = collections[index];
+                        final isSelected = col.id == _selectedCollectionId;
+
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedCollectionId = col.id;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primaryMuted
+                                  : (isDark
+                                  ? AppColors.surfaceVariantDark
+                                  : AppColors.surfaceVariant),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : borderColor,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.folder_rounded,
+                                  size: 16,
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.textTertiary,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  col.name,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
               ),
 
               const Spacer(),
