@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../features/analytics/screens/analytic_screen.dart';
 import '../features/collection/screen/collection_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -21,6 +22,7 @@ class _BottomNavState extends State<BottomNav>
   final List<Widget> _screens = const [
     HomeScreen(),
     CollectionsScreen(),
+    AnalyticsScreen(),
     SettingsScreen(),
   ];
 
@@ -34,6 +36,11 @@ class _BottomNavState extends State<BottomNav>
       label:      'Collections',
       icon:       Icons.folder_outlined,
       activeIcon: Icons.folder_rounded,
+    ),
+    _NavItem(
+      label:      'Analytics',
+      icon:       Icons.bar_chart_outlined,
+      activeIcon: Icons.bar_chart_rounded,
     ),
     _NavItem(
       label:         'Settings',

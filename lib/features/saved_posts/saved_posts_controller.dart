@@ -111,6 +111,10 @@ class SavedPostsController {
     await _service.deleteAllPosts();
   }
 
+  Future<void> onPostOpened(String postId) async {
+    await _service.incrementVisit(postId);
+  }
+
   List<String> _generateTags(Metadata data) {
     final tags = <String>{};
 

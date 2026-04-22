@@ -304,17 +304,30 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                         children: [
 
                           /// 📁 Folder Icon
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryMuted,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.folder_rounded,
-                              size: 22,
-                              color: AppColors.primary,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryMuted,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.folder_rounded,
+                                  size: 22,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+
+                              if (collection.isPinned) ...[
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.push_pin,
+                                  size: 14,
+                                  color: AppColors.primary,
+                                ),
+                              ],
+                            ],
                           ),
 
                           /// ⋮ Menu
@@ -352,8 +365,46 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                                   ),
                                 );
                               }
+
+                              if (value == 'pin') {
+                                HapticFeedback.selectionClick();
+
+                                final success = await controller.togglePin(collection);
+
+                                if (!success) {
+                                  // 👉 show paywall
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const SubscriptionScreen(),
+                                    ),
+                                  );
+                                }
+                              }
                             },
                             itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'pin',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      collection.isPinned
+                                          ? Icons.push_pin
+                                          : Icons.push_pin_outlined,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Text(collection.isPinned ? 'Unpin' : 'Pin'),
+
+                                    const Spacer(),
+
+                                    Icon(
+                                      Icons.star_rounded,
+                                      size: 14,
+                                      color: AppColors.primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
                               const PopupMenuItem(
                                 value: 'edit',
                                 child: Text('Edit'),

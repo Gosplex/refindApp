@@ -351,6 +351,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 '20 bookmarks',
                                 '3 collections',
                                 'Smart reminders',
+                                'Basic analytics'
                               ],
                             ),
                           ),
@@ -367,10 +368,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               features: const [
                                 'Unlimited bookmarks',
                                 'Unlimited collections',
+                                'Pinned collections',
                                 'Smart reminders',
                                 'Default reminder',
                                 'Stop reminding after',
                                 'Quiet hours',
+                                'Advanced analytics'
                               ],
                             ),
                           ),

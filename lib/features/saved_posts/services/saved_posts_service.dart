@@ -74,6 +74,13 @@ class SavedPostsService {
     });
   }
 
+  Future<void> incrementVisit(String postId) async {
+    await _postsRef.doc(postId).update({
+      'visitCount': FieldValue.increment(1),
+      'lastVisitedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
   Future<bool> canAddPost() async {
     final doc = await _userRef.get();
 

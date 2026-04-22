@@ -15,6 +15,9 @@ class SavedPost {
   final bool isDismissed;
   final DateTime? lastRemindedAt;
 
+  final int visitCount;
+  final DateTime? lastVisitedAt;
+
   final DateTime createdAt;
 
   SavedPost({
@@ -26,9 +29,11 @@ class SavedPost {
     this.source,
     this.domain,
     this.tags,
-    this.collectionId, // ✅ added
+    this.collectionId,
     this.reminderCount = 0,
     this.isDismissed = false,
+    this.visitCount = 0,
+    this.lastVisitedAt,
     this.lastRemindedAt,
     required this.createdAt,
   });
@@ -46,8 +51,10 @@ class SavedPost {
       'source': source,
       'domain': domain,
       'tags': tags,
-      'collectionId': collectionId, // ✅ added
+      'collectionId': collectionId,
       'reminderCount': reminderCount,
+      'visitCount': visitCount,
+      'lastVisitedAt': lastVisitedAt?.toIso8601String(),
       'isDismissed': isDismissed,
       'lastRemindedAt': lastRemindedAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
@@ -68,8 +75,12 @@ class SavedPost {
       domain: map['domain'],
       tags: map['tags'] != null ? List<String>.from(map['tags']) : null,
 
-      /// ✅ safe read (backward compatible)
       collectionId: map['collectionId'],
+
+      visitCount: map['visitCount'] ?? 0,
+      lastVisitedAt: map['lastVisitedAt'] != null
+          ? DateTime.parse(map['lastVisitedAt'])
+          : null,
 
       reminderCount: map['reminderCount'] ?? 0,
       isDismissed: map['isDismissed'] ?? false,
@@ -92,6 +103,8 @@ class SavedPost {
     String? domain,
     List<String>? tags,
     String? collectionId,
+    int? visitCount,
+    DateTime? lastVisitedAt,
     int? reminderCount,
     bool? isDismissed,
     DateTime? lastRemindedAt,
@@ -107,6 +120,8 @@ class SavedPost {
       tags: tags ?? this.tags,
       collectionId: collectionId ?? this.collectionId,
       reminderCount: reminderCount ?? this.reminderCount,
+      visitCount: visitCount ?? this.visitCount,
+      lastVisitedAt: lastVisitedAt ?? this.lastVisitedAt,
       isDismissed: isDismissed ?? this.isDismissed,
       lastRemindedAt: lastRemindedAt ?? this.lastRemindedAt,
       createdAt: createdAt,

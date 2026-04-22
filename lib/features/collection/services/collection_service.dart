@@ -55,6 +55,22 @@ class CollectionsService {
     await _collectionsRef.doc(id).update(data);
   }
 
+  Future<bool> togglePinSmart(CollectionModel collection) async {
+    final user = await getCurrentUser();
+
+    if (user == null) return false;
+
+    if (!user.isPro) {
+      return false;
+    }
+
+    await _collectionsRef.doc(collection.id).set({
+      'isPinned': !collection.isPinned,
+    }, SetOptions(merge: true));
+
+    return true;
+  }
+
   /// ─────────────────────────────────────────────
   /// ❌ Delete
   /// ─────────────────────────────────────────────

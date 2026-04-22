@@ -71,6 +71,10 @@ class CollectionsController {
     await _service.deleteCollection(id, deletePosts: deletePosts);
   }
 
+  Future<bool> togglePin(CollectionModel collection) async {
+    return await _service.togglePinSmart(collection);
+  }
+
   /// ─────────────────────────────────────────────
   /// 🌱 Seed Default Collections
   /// ─────────────────────────────────────────────

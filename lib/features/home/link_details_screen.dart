@@ -75,10 +75,8 @@ class _LinkDetailScreenState extends State<LinkDetailScreen> {
     final post = widget.post;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor =
-    isDark ? AppColors.surfaceDark : AppColors.surface;
-    final borderColor =
-    isDark ? AppColors.borderDark : AppColors.border;
+    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
+    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
 
     return Scaffold(
       appBar: AppBar(
@@ -89,7 +87,6 @@ class _LinkDetailScreenState extends State<LinkDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             if (post.image != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
@@ -105,27 +102,25 @@ class _LinkDetailScreenState extends State<LinkDetailScreen> {
 
             if (post.domain != null)
               Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.primaryMuted,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   post.domain!,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: AppColors.primary),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: AppColors.primary),
                 ),
               ),
 
             const SizedBox(height: 12),
 
-            Text(
-              post.title,
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
+            Text(post.title, style: Theme.of(context).textTheme.headlineSmall),
 
             const SizedBox(height: 8),
 
@@ -144,23 +139,21 @@ class _LinkDetailScreenState extends State<LinkDetailScreen> {
                 children: post.tags!
                     .map(
                       (tag) => Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: borderColor,
-                        width: 0.8,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: borderColor, width: 0.8),
+                        ),
+                        child: Text(
+                          tag,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      tag,
-                      style:
-                      Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ),
-                )
+                    )
                     .toList(),
               ),
 
@@ -173,8 +166,10 @@ class _LinkDetailScreenState extends State<LinkDetailScreen> {
                 _openCollectionPicker();
               },
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: surfaceColor,
                   borderRadius: BorderRadius.circular(14),
@@ -182,17 +177,18 @@ class _LinkDetailScreenState extends State<LinkDetailScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.folder_rounded,
-                        size: 20, color: AppColors.primary),
+                    const Icon(
+                      Icons.folder_rounded,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         _selectedCollectionId == null
                             ? 'Add to collection'
-                            : (_selectedCollectionName ??
-                            'Update collection'),
-                        style:
-                        Theme.of(context).textTheme.titleSmall,
+                            : (_selectedCollectionName ?? 'Update collection'),
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
                     const Icon(Icons.chevron_right_rounded, size: 20),
@@ -204,100 +200,96 @@ class _LinkDetailScreenState extends State<LinkDetailScreen> {
         ),
       ),
 
-        bottomNavigationBar: Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          decoration: BoxDecoration(
-            color: surfaceColor,
-            border: Border(
-              top: BorderSide(color: borderColor, width: 0.6),
-            ),
-          ),
-          child: Row(
-            children: [
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          border: Border(top: BorderSide(color: borderColor, width: 0.6)),
+        ),
+        child: Row(
+          children: [
+            _ActionButton(
+              icon: post.isDismissed
+                  ? Icons.notifications_off_outlined
+                  : Icons.notifications_outlined,
 
-              _ActionButton(
-                icon: post.isDismissed
-                    ? Icons.notifications_off_outlined
-                    : Icons.notifications_outlined,
+              label: post.isDismissed ? 'Dismissed' : 'Remind',
 
-                label: post.isDismissed ? 'Dismissed' : 'Remind',
+              isDisabled: post.isDismissed,
 
-                isDisabled: post.isDismissed,
+              onTap: () async {
+                if (post.isDismissed) return;
 
-                onTap: () async {
-                  if (post.isDismissed) return;
+                HapticFeedback.lightImpact();
 
-                  HapticFeedback.lightImpact();
+                await _postsController.dismissPost(post.id);
 
-                  await _postsController.dismissPost(post.id);
-
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('You’ll be reminded later'),
-                      ),
-                    );
-                  }
-                },
-              ),
-
-              const SizedBox(width: 10),
-
-              _ActionButton(
-                icon: Icons.delete_outline_rounded,
-                label: 'Delete',
-                isDestructive: true,
-                onTap: () async {
-                  HapticFeedback.mediumImpact();
-
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (context) {
-                      return AlertDialog(
-                        title: const Text('Delete post?'),
-                        content: const Text('This action cannot be undone.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                            ),
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      );
-                    },
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You’ll be reminded later')),
                   );
+                }
+              },
+            ),
 
-                  if (confirm == true) {
-                    await _postsController.deletePost(post.id);
-                    if (mounted) Navigator.pop(context);
-                  }
-                },
-              ),
+            const SizedBox(width: 10),
 
-              const SizedBox(width: 10),
+            _ActionButton(
+              icon: Icons.delete_outline_rounded,
+              label: 'Delete',
+              isDestructive: true,
+              onTap: () async {
+                HapticFeedback.mediumImpact();
 
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      openUrl(post.url);
-                    },
-                    child: const Text('Visit link'),
-                  ),
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: const Text('Delete post?'),
+                      content: const Text('This action cannot be undone.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                if (confirm == true) {
+                  await _postsController.deletePost(post.id);
+                  if (mounted) Navigator.pop(context);
+                }
+              },
+            ),
+
+            const SizedBox(width: 10),
+
+            Expanded(
+              flex: 2,
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    HapticFeedback.lightImpact();
+                    _postsController.onPostOpened(post.id);
+                    openUrl(post.url);
+                  },
+                  child: const Text('Visit link'),
                 ),
               ),
-            ],
-          ),
-        )
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -316,14 +308,12 @@ class _CollectionPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor =
-    isDark ? AppColors.surfaceDark : AppColors.surface;
+    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
 
     return Container(
       decoration: BoxDecoration(
         color: surfaceColor,
-        borderRadius:
-        const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
@@ -348,15 +338,15 @@ class _CollectionPickerSheet extends StatelessWidget {
                     return ListTile(
                       leading: Icon(
                         Icons.folder_rounded,
-                        color: isSelected
-                            ? AppColors.primary
-                            : null,
+                        color: isSelected ? AppColors.primary : null,
                       ),
                       title: Text(c.name),
                       selected: isSelected,
                       trailing: isSelected
-                          ? const Icon(Icons.check_rounded,
-                          color: AppColors.primary)
+                          ? const Icon(
+                              Icons.check_rounded,
+                              color: AppColors.primary,
+                            )
                           : null,
                       onTap: () => onSelect(c),
                     );
@@ -370,7 +360,6 @@ class _CollectionPickerSheet extends StatelessWidget {
     );
   }
 }
-
 
 class _ActionButton extends StatelessWidget {
   final IconData icon;
@@ -421,10 +410,9 @@ class _ActionButton extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 label,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: textColor),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: textColor),
               ),
             ],
           ),

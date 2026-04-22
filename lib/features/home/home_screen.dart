@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:metadata_fetch/metadata_fetch.dart';
 import 'package:provider/provider.dart';
+import 'package:refind_app/features/home/widgets/pinned_card.dart';
+import 'package:refind_app/features/home/widgets/pinned_shimmer.dart';
 import 'package:refind_app/features/subscription/subscription_screen.dart';
 
 import '../../core/theme/colors.dart';
@@ -267,6 +269,52 @@ class _HomeScreenState extends State<HomeScreen> {
                   prefixIcon: const Icon(Icons.search_rounded, size: 18),
                 ),
               ),
+            ),
+            StreamBuilder<List<CollectionModel>>(
+              stream: CollectionsController().getCollectionsStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const PinnedShimmer();
+                }
+
+                final collections = snapshot.data ?? [];
+
+                final pinned = collections.where((c) => c.isPinned).toList();
+
+                if (pinned.isEmpty) return const SizedBox.shrink();
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'Pinned Collections',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    SizedBox(
+                      height: 90,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: pinned.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final col = pinned[index];
+
+                          return PinnedCard(collection: col);
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             Expanded(
               child: StreamBuilder<List<SavedPost>>(

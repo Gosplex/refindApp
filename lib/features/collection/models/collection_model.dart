@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class CollectionModel {
   final String id;
   final String name;
@@ -6,6 +8,8 @@ class CollectionModel {
   final String userId;
   final DateTime createdAt;
 
+  final bool isPinned;
+
   const CollectionModel({
     required this.id,
     required this.name,
@@ -13,12 +17,16 @@ class CollectionModel {
     required this.isDefault,
     required this.userId,
     required this.createdAt,
+    this.isPinned = false,
   });
 
   /// ─────────────────────────────────────────────
   /// 🔄 From Firestore
   /// ─────────────────────────────────────────────
-  factory CollectionModel.fromMap(Map<String, dynamic> map, String docId) {
+  factory CollectionModel.fromMap(
+      Map<String, dynamic> map,
+      String docId,
+      ) {
     return CollectionModel(
       id: docId,
       name: map['name'] ?? '',
@@ -26,6 +34,7 @@ class CollectionModel {
       isDefault: map['isDefault'] ?? false,
       userId: map['userId'] ?? '',
       createdAt: (map['createdAt'] as dynamic).toDate(),
+      isPinned: map['isPinned'] ?? false,
     );
   }
 
@@ -39,6 +48,7 @@ class CollectionModel {
       'isDefault': isDefault,
       'userId': userId,
       'createdAt': createdAt,
+      'isPinned': isPinned,
     };
   }
 
@@ -49,6 +59,7 @@ class CollectionModel {
     String? name,
     String? description,
     bool? isDefault,
+    bool? isPinned,
   }) {
     return CollectionModel(
       id: id,
@@ -57,6 +68,7 @@ class CollectionModel {
       isDefault: isDefault ?? this.isDefault,
       userId: userId,
       createdAt: createdAt,
+      isPinned: isPinned ?? this.isPinned,
     );
   }
 }
