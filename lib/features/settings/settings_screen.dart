@@ -35,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ── settings state ─────────────────────────────────────────────────────────
   bool isLoading = true;
   bool notificationsEnabled = true;
+  bool weekRecapEnabled = false;
   String defaultReminder = '2 hours';
   String stopAfter = '3 days';
   String theme = 'System';
@@ -67,6 +68,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final s = controller.settings!;
     setState(() {
       notificationsEnabled = s.notificationsEnabled;
+      weekRecapEnabled = s.weekRecapEnabled;
       defaultReminder = s.defaultReminder;
       stopAfter = s.stopAfter;
       theme = s.theme;
@@ -83,6 +85,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await controller.updateSettings(
       UserSettings(
         notificationsEnabled: notificationsEnabled,
+        weekRecapEnabled: weekRecapEnabled,
         defaultReminder: defaultReminder,
         stopAfter: stopAfter,
         theme: theme,
@@ -146,6 +149,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Sign-in failed"), showCloseIcon: true),
+      );
+    }
+  }
+
+  Future<void> _showDeleteAccountDialog() async {
+    HapticFeedback.lightImpact();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          'Delete account?',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        content: Text(
+          'This will permanently delete your account, collections, and all saved links.\n\nThis cannot be undone.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Delete',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Deleting account...")),
+      );
+
+      await AuthController().deleteAccount(); // 👈 we’ll create this
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Account deleted"),
+          showCloseIcon: true,
+        ),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Failed to delete account"),
+          showCloseIcon: true,
+        ),
       );
     }
   }
@@ -268,6 +332,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.surfaceDark : AppColors.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? AppColors.borderDark : AppColors.border,
+                          width: 0.8,
+                        ),
+                      ),
+                      child: _SwitchRow(
+                        title: 'Weekly Recap',
+                        value: weekRecapEnabled,
+                        isDark: isDark,
+                        onChanged: (val) async {
+                          if (!isSubscribed) return;
+
+                          HapticFeedback.selectionClick();
+                          setState(() => weekRecapEnabled = val);
+                          await _saveSettings();
+                        },
+                      ),
+                    ),
+
+                    if (!isSubscribed)
+                      Positioned.fill(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SubscriptionScreen(),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              color: (isDark
+                                  ? AppColors.surfaceDark
+                                  : AppColors.surface)
+                                  .withOpacity(0.88),
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              child: Row(
+                                children: [
+                                  const Spacer(),
+
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryMuted,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.lock_rounded,
+                                          size: 12,
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Premium',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .labelSmall
+                                              ?.copyWith(color: AppColors.primary),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 20),
 
@@ -358,6 +511,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Clear All Saved Posts',
                     onTap: _showClearDialog,
                   ),
+                  if (!auth.isAnonymous()) ...[
+                    _Divider(isDark: isDark),
+
+                    _DangerRow(
+                      title: 'Delete Account',
+                      onTap: _showDeleteAccountDialog,
+                    ),
+                  ],
                 ],
               ),
 

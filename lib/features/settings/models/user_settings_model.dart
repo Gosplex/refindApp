@@ -4,6 +4,8 @@ class UserSettings {
   final String stopAfter;
   final String theme;
 
+  final bool weekRecapEnabled;
+
   final int quietStartHour;
   final int quietStartMinute;
   final int quietEndHour;
@@ -11,6 +13,7 @@ class UserSettings {
 
   UserSettings({
     required this.notificationsEnabled,
+    required this.weekRecapEnabled,
     required this.defaultReminder,
     required this.stopAfter,
     required this.theme,
@@ -23,6 +26,7 @@ class UserSettings {
   Map<String, dynamic> toMap() {
     return {
       'notificationsEnabled': notificationsEnabled,
+      'weekRecapEnabled': weekRecapEnabled,
       'defaultReminder': defaultReminder,
       'stopAfter': stopAfter,
       'theme': theme,
@@ -36,6 +40,7 @@ class UserSettings {
   factory UserSettings.fromMap(Map<String, dynamic> map) {
     return UserSettings(
       notificationsEnabled: map['notificationsEnabled'] ?? true,
+      weekRecapEnabled: map['weekRecapEnabled'] ?? false,
       defaultReminder: map['defaultReminder'] ?? "2 hours",
       stopAfter: map['stopAfter'] ?? "3 days",
       theme: map['theme'] ?? "System",

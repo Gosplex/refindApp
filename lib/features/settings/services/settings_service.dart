@@ -18,6 +18,7 @@ class SettingsService {
     if (!doc.exists) {
       final defaultSettings = UserSettings(
         notificationsEnabled: true,
+        weekRecapEnabled: false,
         defaultReminder: "2 hours",
         stopAfter: "3 days",
         theme: "System",

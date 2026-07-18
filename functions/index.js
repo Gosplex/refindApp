@@ -402,6 +402,280 @@ exports.cleanupNotifications = onSchedule(
     }
 );
 
+exports.weeklyRecap = onSchedule(
+    {
+        schedule: "0 * * * *",
+        timeoutSeconds: 300,
+        memory: "256MiB",
+        secrets: [onesignalApiKey, onesignalAppId, openRouterApiKey],
+    },
+    async () => {
+        try {
+            logger.info("⏱ Weekly recap check running");
+
+            const now = new Date();
+
+            const londonParts = new Intl.DateTimeFormat("en-GB", {
+                timeZone: "Europe/London",
+                weekday: "short",
+                hour: "numeric",
+                hour12: false,
+            }).formatToParts(now);
+
+            const day = londonParts.find(p => p.type === "weekday")?.value;
+            const hour = parseInt(
+                londonParts.find(p => p.type === "hour")?.value || "0"
+            );
+
+            // ✅ time window safety
+            if (day !== "Sun") return;
+            if (hour < 10 || hour > 11) return;
+
+            logger.info("🚀 Weekly recap window active");
+
+            const usersSnap = await db.collection("users").get();
+
+            for (const userDoc of usersSnap.docs) {
+                const userId = userDoc.id;
+                const user = userDoc.data();
+
+                try {
+                    // 🔒 CONDITIONS
+                    if (!user.isPro) continue;
+
+                    const settings = user.settings || {};
+                    if (settings.notificationsEnabled === false) continue;
+                    if (settings.weekRecapEnabled === false) continue;
+
+                    // 🧠 TRACKING
+                    const recapRef = db
+                        .collection("users")
+                        .doc(userId)
+                        .collection("meta")
+                        .doc("weekly_recap");
+
+                    const recapDoc = await recapRef.get();
+                    const weekKey = getWeekKey(now);
+
+                    if (recapDoc.exists && recapDoc.data()?.lastSent === weekKey) {
+                        continue;
+                    }
+
+                    // 📥 POSTS
+                    const postsSnap = await db
+                        .collection("users")
+                        .doc(userId)
+                        .collection("posts")
+                        .get();
+
+                    const posts = postsSnap.docs.map(d => d.data());
+                    if (posts.length === 0) continue;
+
+                    // 📥 COLLECTIONS
+                    const collectionsSnap = await db
+                        .collection("users")
+                        .doc(userId)
+                        .collection("collections")
+                        .get();
+
+                    const collectionMap = {};
+                    collectionsSnap.docs.forEach(doc => {
+                        collectionMap[doc.id] = doc.data().name;
+                    });
+
+                    // 📊 ANALYTICS
+                    const total = posts.length;
+                    const revisited = posts.filter(p => (p.visitCount || 0) > 0).length;
+                    const revisitRate = Math.round((revisited / total) * 100);
+                    const backlog = posts.filter(p => (p.visitCount || 0) === 0).length;
+
+                    // 🔥 WORST COLLECTION
+                    const stats = {};
+
+                    posts.forEach(p => {
+                        const key = p.collectionId || "uncategorized";
+
+                        if (!stats[key]) {
+                            stats[key] = { total: 0, revisited: 0 };
+                        }
+
+                        stats[key].total++;
+
+                        if ((p.visitCount || 0) > 0) {
+                            stats[key].revisited++;
+                        }
+                    });
+
+                    let worstCollectionId = null;
+                    let worstRate = 999;
+
+                    for (const key in stats) {
+                        const data = stats[key];
+                        const rate = data.revisited / data.total;
+
+                        if (rate < worstRate) {
+                            worstRate = rate;
+                            worstCollectionId = key;
+                        }
+                    }
+
+                    const worstCollectionName =
+                        collectionMap[worstCollectionId] || "your collection";
+
+                    // 🤖 AI PROMPT
+                    const prompt = `
+You are a product writer for a calm, minimal productivity app.
+
+This notification is a **WEEKLY RECAP**.
+The user must immediately understand that this is a reflection of their week.
+
+---
+
+GOAL:
+- Make it feel like a weekly summary
+- Not a random reminder
+- Not generic advice
+
+---
+
+TONE:
+- calm
+- honest
+- slightly reflective
+- emotionally intelligent
+- NOT motivational
+- NOT hype
+- NOT corporate
+
+---
+
+USER DATA:
+- Saved: ${total}
+- Revisited: ${revisited}
+- Revisit rate: ${revisitRate}%
+- Unread: ${backlog}
+- Weakest area: ${worstCollectionName}
+
+---
+
+WRITING RULES:
+
+- Title MUST imply time context (weekly / this week / your week)
+- Body MUST feel like a reflection, not instruction
+- Max 10 words title
+- Max 16 words body
+
+- No:
+  "we believe in you"
+  "great job"
+  "keep going"
+  "don't forget"
+
+- No exclamation marks
+- No emojis
+
+---
+
+STRUCTURE:
+
+Title → signals weekly recap  
+Body → insight about behavior  
+
+---
+
+GOOD EXAMPLES:
+
+"title": "Your week in saved links"
+"body": "You saved ${total}, but revisited only ${revisited}"
+
+"title": "This week, things piled up"
+"body": "${backlog} links still untouched in ${worstCollectionName}"
+
+"title": "Your weekly recap"
+"body": "You revisited ${revisitRate}% of what you saved"
+
+---
+
+BAD EXAMPLES:
+
+- "Unopened links linger..."
+- "Don't forget to revisit"
+- "Stay consistent"
+
+---
+
+Return ONLY JSON:
+
+{
+  "title": "...",
+  "body": "..."
+}
+`;
+
+                    let title = "Your weekly recap";
+                    let body = `You revisited ${revisitRate}% of links`;
+
+                    try {
+                        const response = await axios.post(
+                            OPENROUTER_API_URL,
+                            {
+                                model: "openai/gpt-4o-mini",
+                                messages: [{ role: "user", content: prompt }],
+                            },
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${openRouterApiKey.value()}`,
+                                    "Content-Type": "application/json",
+                                },
+                            }
+                        );
+
+                        const ai = JSON.parse(response.data.choices[0].message.content);
+                        title = ai.title;
+                        body = ai.body;
+                    } catch (e) {
+                        logger.warn("AI failed, using fallback");
+                    }
+
+                    // 📲 SEND
+                    await sendOneSignalNotification(userId, title, body, {
+                        type: "weekly_recap",
+                        revisitRate,
+                        backlog,
+                        weakest: worstCollectionName,
+                    });
+
+                    // 🧠 TRACK
+                    await recapRef.set({
+                        lastSent: weekKey,
+                        sentAt: admin.firestore.Timestamp.now(),
+                        title,
+                        body,
+                        weakest: worstCollectionName,
+                    });
+
+                    logger.info(`✅ Sent weekly recap to ${userId}`);
+
+                } catch (err) {
+                    logger.error(`❌ Error user ${userId}`, err);
+                }
+            }
+
+        } catch (error) {
+            logger.error("❌ Weekly recap job failed", error);
+        }
+    }
+);
+
+// helper
+function getWeekKey(date) {
+    const year = date.getFullYear();
+    const firstDay = new Date(date.getFullYear(), 0, 1);
+    const pastDays = (date - firstDay) / 86400000;
+    const week = Math.ceil((pastDays + firstDay.getDay() + 1) / 7);
+    return `${year}-W${week}`;
+}
+
 exports.testProcessNow = onRequest(
     {
         cors: true,
@@ -467,6 +741,239 @@ exports.testProcessNow = onRequest(
         } catch (error) {
             logger.error("Error in testProcessNow:", error);
             res.status(500).json({ success: false, error: error.message });
+        }
+    }
+
+
+);
+
+
+exports.testWeeklyRecap = onRequest(
+    {
+        secrets: [onesignalApiKey, onesignalAppId, openRouterApiKey],
+    },
+    async (req, res) => {
+        try {
+            logger.info("🧪 Manual weekly recap test triggered");
+
+            const usersSnap = await db.collection("users").get();
+
+            for (const userDoc of usersSnap.docs) {
+                const userId = userDoc.id;
+
+                try {
+                    // 📥 POSTS
+                    const postsSnap = await db
+                        .collection("users")
+                        .doc(userId)
+                        .collection("posts")
+                        .get();
+
+                    const posts = postsSnap.docs.map((d) => d.data());
+                    if (posts.length === 0) {
+                        logger.info(`No posts for ${userId}`);
+                        continue;
+                    }
+
+                    // 📥 COLLECTIONS
+                    const collectionsSnap = await db
+                        .collection("users")
+                        .doc(userId)
+                        .collection("collections")
+                        .get();
+
+                    const collectionMap = {};
+                    collectionsSnap.docs.forEach((doc) => {
+                        collectionMap[doc.id] = doc.data().name;
+                    });
+
+                    // 📊 ANALYTICS
+                    const total = posts.length;
+                    const revisited = posts.filter(
+                        (p) => (p.visitCount || 0) > 0
+                    ).length;
+                    const revisitRate = Math.round((revisited / total) * 100);
+                    const backlog = posts.filter(
+                        (p) => (p.visitCount || 0) === 0
+                    ).length;
+
+                    // 🔥 WORST COLLECTION
+                    const stats = {};
+
+                    posts.forEach((p) => {
+                        const key = p.collectionId || "uncategorized";
+
+                        if (!stats[key]) {
+                            stats[key] = { total: 0, revisited: 0 };
+                        }
+
+                        stats[key].total++;
+
+                        if ((p.visitCount || 0) > 0) {
+                            stats[key].revisited++;
+                        }
+                    });
+
+                    let worstCollectionId = null;
+                    let worstRate = 999;
+
+                    for (const key in stats) {
+                        const data = stats[key];
+                        const rate = data.revisited / data.total;
+
+                        if (rate < worstRate) {
+                            worstRate = rate;
+                            worstCollectionId = key;
+                        }
+                    }
+
+                    const worstCollectionName =
+                        collectionMap[worstCollectionId] || "your collection";
+
+                    // 🤖 AI PROMPT
+                    const prompt = `
+You are a product writer for a calm, minimal productivity app.
+
+This notification is a **WEEKLY RECAP**.
+The user must immediately understand that this is a reflection of their week.
+
+---
+
+GOAL:
+- Make it feel like a weekly summary
+- Not a random reminder
+- Not generic advice
+
+---
+
+TONE:
+- calm
+- honest
+- slightly reflective
+- emotionally intelligent
+- NOT motivational
+- NOT hype
+- NOT corporate
+
+---
+
+USER DATA:
+- Saved: ${total}
+- Revisited: ${revisited}
+- Revisit rate: ${revisitRate}%
+- Unread: ${backlog}
+- Weakest area: ${worstCollectionName}
+
+---
+
+WRITING RULES:
+
+- Title MUST imply time context (weekly / this week / your week)
+- Body MUST feel like a reflection, not instruction
+- Max 10 words title
+- Max 16 words body
+
+- No:
+  "we believe in you"
+  "great job"
+  "keep going"
+  "don't forget"
+
+- No exclamation marks
+- No emojis
+
+---
+
+STRUCTURE:
+
+Title → signals weekly recap  
+Body → insight about behavior  
+
+---
+
+GOOD EXAMPLES:
+
+"title": "Your week in saved links"
+"body": "You saved ${total}, but revisited only ${revisited}"
+
+"title": "This week, things piled up"
+"body": "${backlog} links still untouched in ${worstCollectionName}"
+
+"title": "Your weekly recap"
+"body": "You revisited ${revisitRate}% of what you saved"
+
+---
+
+BAD EXAMPLES:
+
+- "Unopened links linger..."
+- "Don't forget to revisit"
+- "Stay consistent"
+
+---
+
+Return ONLY JSON:
+
+{
+  "title": "...",
+  "body": "..."
+}
+`;
+                    let title = "Your weekly recap";
+                    let body = `You revisited ${revisitRate}% of links`;
+
+                    try {
+                        const response = await axios.post(
+                            OPENROUTER_API_URL,
+                            {
+                                model: "openai/gpt-4o-mini",
+                                messages: [{ role: "user", content: prompt }],
+                            },
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${openRouterApiKey.value()}`,
+                                    "Content-Type": "application/json",
+                                },
+                            }
+                        );
+
+                        const ai = JSON.parse(
+                            response.data.choices[0].message.content
+                        );
+
+                        title = ai.title;
+                        body = ai.body;
+                    } catch (e) {
+                        logger.warn("AI failed, using fallback");
+                    }
+
+                    // 🧪 DEBUG (important)
+                    logger.info({
+                        userId,
+                        title,
+                        body,
+                        appId: onesignalAppId.value(),
+                        hasKey: !!onesignalApiKey.value(),
+                    });
+
+                    // 📲 SEND
+                    await sendOneSignalNotification(userId, title, body, {
+                        type: "test_weekly",
+                        revisitRate,
+                        backlog,
+                        weakest: worstCollectionName,
+                    });
+
+                    logger.info(`🧪 Sent test recap to ${userId}`);
+                } catch (err) {
+                    logger.error(`❌ Error user ${userId}`, err);
+                }
+            }
+
+            res.send("✅ Test weekly recap sent");
+        } catch (error) {
+            logger.error("❌ Test function failed", error);
+            res.status(500).send("Error");
         }
     }
 );

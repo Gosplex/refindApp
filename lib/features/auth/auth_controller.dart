@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../core/model/app_user_model.dart';
 import '../../core/utils/device_info_helper.dart';
@@ -93,5 +94,67 @@ class AuthController {
 
       return updatedUser;
     }
+  }
+
+  Future<void> deleteAccount() async {
+    final user = _authService.currentUser;
+    if (user == null) throw Exception("No user");
+
+    final uid = user.uid;
+    final firestore = FirebaseFirestore.instance;
+
+    /// 🔐 1. Ensure recent login (CRITICAL)
+    try {
+      await user.delete(); // try directly first
+      return;
+    } on FirebaseAuthException catch (e) {
+      if (e.code != 'requires-recent-login') {
+        rethrow;
+      }
+    }
+
+    /// 🔁 2. Reauthenticate (Google)
+    final googleUser = await GoogleSignIn().signIn();
+    if (googleUser == null) {
+      throw Exception("Reauthentication cancelled");
+    }
+
+    final googleAuth = await googleUser.authentication;
+
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    await user.reauthenticateWithCredential(credential);
+
+    /// 🧹 3. Delete Firestore data (AFTER auth is valid)
+
+    final collectionsRef =
+    firestore.collection('users').doc(uid).collection('collections');
+
+    final postsRef =
+    firestore.collection('users').doc(uid).collection('posts');
+
+    final collectionsSnap = await collectionsRef.get();
+    final postsSnap = await postsRef.get();
+
+    final batch = firestore.batch();
+
+    for (final doc in collectionsSnap.docs) {
+      batch.delete(doc.reference);
+    }
+
+    for (final doc in postsSnap.docs) {
+      batch.delete(doc.reference);
+    }
+
+    await batch.commit();
+
+    /// 🧹 4. Delete main user doc
+    await firestore.collection('users').doc(uid).delete();
+
+    /// 🔐 5. Delete auth user (FINAL)
+    await user.delete();
   }
 }
