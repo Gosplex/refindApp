@@ -11,7 +11,7 @@ abstract final class AppTextStyles {
     double letterSpacing = 0.0,
     double height = 1.4,
   }) =>
-      GoogleFonts.josefinSans(
+      GoogleFonts.plusJakartaSans(
         fontSize:      fontSize,
         fontWeight:    fontWeight,
         color:         color,
