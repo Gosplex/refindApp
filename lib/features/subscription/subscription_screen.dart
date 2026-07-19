@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/models/package_wrapper.dart';
-import '../../core/theme/colors.dart';
-import '../../services/in_app_purchase_service.dart';
-import 'package:intl/intl.dart';
 
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/colors.dart';
+import '../../core/theme/theme_x.dart';
+import '../../core/widgets/widgets.dart';
+import '../../services/in_app_purchase_service.dart';
 import '../auth/auth_service.dart';
 
 class SubscriptionScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   bool _isYearly = true;
 
   final iap = InAppPurchaseService();
+  final auth = AuthService();
 
   bool _loading = true;
   bool _isPurchasing = false;
@@ -26,24 +29,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Package? get _monthly => iap.monthlyPackage;
   Package? get _yearly => iap.yearlyPackage;
 
-  NumberFormat _currencyFormatter(BuildContext context) {
-    final locale = Localizations.localeOf(context).toString();
-
-    return NumberFormat.simpleCurrency(locale: locale);
-  }
-
   String get currencySymbol {
     final package = _yearly ?? _monthly;
-
     if (package == null) return '';
-
-    return package.storeProduct.priceString.replaceAll(
-      RegExp(r'[0-9.,\s]'),
-      '',
-    );
+    return package.storeProduct.priceString
+        .replaceAll(RegExp(r'[0-9.,\s]'), '');
   }
-
-  final auth = AuthService();
 
   @override
   void initState() {
@@ -74,7 +65,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     if (!_isYearly || _yearly == null) return 'Billed monthly';
     final yearlyPrice = _yearly!.storeProduct.price;
     final perMonth = (yearlyPrice / 12).round();
-    return '$perMonth / month · billed yearly';
+    return '$currencySymbol$perMonth / month · billed yearly';
   }
 
   int get _savingPercent {
@@ -89,7 +80,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   Future<void> _subscribe() async {
     if (_isPurchasing) return;
-
     setState(() => _isPurchasing = true);
 
     try {
@@ -99,13 +89,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           setState(() => _isPurchasing = false);
           return;
         }
-
         final result = await auth.signInWithGoogle();
         if (result == null) {
           setState(() => _isPurchasing = false);
           return;
         }
-
         await auth.ensureDisplayName();
         await InAppPurchaseService().fetchCustomerInfo();
       }
@@ -116,29 +104,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final success = await iap.purchase(package);
 
       if (success && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("You're now Premium 🚀")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("You're now Premium 🚀")),
+        );
         Navigator.pop(context);
       }
     } catch (e) {
-      print("Purchase Error $e");
-
+      debugPrint("Purchase Error $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Purchase failed or cancelled')),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isPurchasing = false);
-      }
+      if (mounted) setState(() => _isPurchasing = false);
     }
   }
 
   Future<void> _restore() async {
     if (_isPurchasing) return;
-
     setState(() => _isPurchasing = true);
 
     try {
@@ -148,13 +132,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           setState(() => _isPurchasing = false);
           return;
         }
-
         final result = await auth.signInWithGoogle();
         if (result == null) {
           setState(() => _isPurchasing = false);
           return;
         }
-
         await auth.ensureDisplayName();
         await InAppPurchaseService().fetchCustomerInfo();
       }
@@ -167,270 +149,160 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         );
       }
     } catch (e) {
-      print("Restore Error $e");
-
+      debugPrint("Restore Error $e");
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Restore failed")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Restore failed")),
+        );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isPurchasing = false);
-      }
+      if (mounted) setState(() => _isPurchasing = false);
     }
   }
 
   Future<bool?> _showLoginRequiredSheet() {
-    return showModalBottomSheet<bool>(
+    return showAppSheet<bool>(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-
-              const Icon(Icons.lock_outline, size: 40),
-
-              const SizedBox(height: 16),
-
-              Text(
-                "Sign in required",
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                "To keep your subscription across devices, please sign in with Google.",
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text("Continue with Google"),
-                ),
-              ),
-
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancel"),
-              ),
-            ],
+      title: 'Sign in required',
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'To keep your subscription across devices, sign in with Google first.',
+            style: ctx.text.bodyMedium,
           ),
-        );
-      },
+          const SizedBox(height: AppSpacing.xl),
+          AppButton(
+            label: 'Continue with Google',
+            icon: Icons.login_rounded,
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          AppButton.ghost(
+            label: 'Cancel',
+            onPressed: () => Navigator.pop(ctx, false),
+          ),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Error state
-    if (_error != null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'Upgrade',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.wifi_off_rounded,
-                  size: 40,
-                  color: AppColors.textTertiary,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Could not load plans',
-                  style: Theme.of(context).textTheme.titleSmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _error!,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 24),
-                OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _loading = true;
-                      _error = null;
-                    });
-                    _loadProducts();
-                  },
-                  child: const Text('Try again'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+    if (_error != null) return _buildError(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Upgrade', style: Theme.of(context).textTheme.titleMedium),
+        title: Text('Upgrade', style: context.text.titleLarge),
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.screen, AppSpacing.sm, AppSpacing.screen, AppSpacing.xxl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Header(isDark: isDark),
+                  const FadeSlideIn(child: _Header()),
+                  const SizedBox(height: AppSpacing.xxl),
 
-                  const SizedBox(height: 28),
-
-                  // Billing toggle — shimmer while loading
-                  _loading
-                      ? _ShimmerBlock(
-                          width: double.infinity,
-                          height: 46,
-                          radius: 12,
-                          isDark: isDark,
-                        )
-                      : _BillingToggle(
-                          isYearly: _isYearly,
-                          savingPercent: _savingPercent,
-                          isDark: isDark,
-                          onToggle: (val) {
-                            HapticFeedback.selectionClick();
-                            setState(() => _isYearly = val);
-                          },
-                        ),
-
-                  const SizedBox(height: 16),
-
-                  // Plan cards — shimmer while loading
-                  _loading
-                      ? Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: _ShimmerBlock(
-                                width: double.infinity,
-                                height: 200,
-                                radius: 16,
-                                isDark: isDark,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _ShimmerBlock(
-                                width: double.infinity,
-                                height: 200,
-                                radius: 16,
-                                isDark: isDark,
-                              ),
-                            ),
-                          ],
-                        )
-                      : StreamBuilder<bool>(
-                          stream: iap.proStatusStream,
-                          initialData: iap.isPro,
-                          builder: (context, snapshot) {
-                            final isPro = snapshot.data ?? false;
-
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: _PlanCard(
-                                    title: 'Free',
-                                    price: '${currencySymbol}0',
-                                    // price: _currencyFormatter(context).format(0),
-                                    period: 'forever',
-                                    isActive: !isPro,
-                                    isDark: isDark,
-                                    features: const [
-                                      'Save a few things',
-                                      'Basic reminders',
-                                      'No visibility into what you actually use',
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _PlanCard(
-                                    title: 'Premium',
-                                    price: _displayPrice,
-                                    period: _displayPeriod,
-                                    perMonthNote: _isYearly
-                                        ? _perMonthNote
-                                        : null,
-                                    highlight: true,
-                                    isActive: isPro,
-                                    isDark: isDark,
-                                    features: const [
-                                      'Save without limits',
-                                      'Get reminded at the right moment',
-                                      'Control when things come back',
-                                      'Understand what you actually revisit vs ignore',
-                                      'Turn saved content into a system you rely on',
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-
-                  const SizedBox(height: 32),
-
-                  Text(
-                    'What actually changes',
-                    style: Theme.of(context).textTheme.titleSmall,
+                  FadeSlideIn(
+                    index: 1,
+                    child: _loading
+                        ? const Shimmer(child: SkeletonBox(height: 46, radius: AppRadius.md))
+                        : _BillingToggle(
+                            isYearly: _isYearly,
+                            savingPercent: _savingPercent,
+                            onToggle: (val) {
+                              HapticFeedback.selectionClick();
+                              setState(() => _isYearly = val);
+                            },
+                          ),
                   ),
+                  const SizedBox(height: AppSpacing.lg),
 
-                  const SizedBox(height: 12),
+                  FadeSlideIn(
+                    index: 2,
+                    child: _loading
+                        ? Shimmer(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: const [
+                                Expanded(child: SkeletonBox(height: 210, radius: AppRadius.lg)),
+                                SizedBox(width: AppSpacing.md),
+                                Expanded(child: SkeletonBox(height: 210, radius: AppRadius.lg)),
+                              ],
+                            ),
+                          )
+                        : StreamBuilder<bool>(
+                            stream: iap.proStatusStream,
+                            initialData: iap.isPro,
+                            builder: (context, snapshot) {
+                              final isPro = snapshot.data ?? false;
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: _PlanCard(
+                                      title: 'Free',
+                                      price: '${currencySymbol}0',
+                                      period: 'forever',
+                                      isActive: !isPro,
+                                      features: const [
+                                        'Save a few things',
+                                        'Basic reminders',
+                                        'No visibility into what you use',
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: _PlanCard(
+                                      title: 'Premium',
+                                      price: _displayPrice,
+                                      period: _displayPeriod,
+                                      perMonthNote:
+                                          _isYearly ? _perMonthNote : null,
+                                      highlight: true,
+                                      isActive: isPro,
+                                      features: const [
+                                        'Save without limits',
+                                        'Reminders at the right moment',
+                                        'Control when things come back',
+                                        'See what you revisit vs ignore',
+                                        'A system you actually rely on',
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                  ),
+                  const SizedBox(height: AppSpacing.xxl),
 
-                  _loading
-                      ? _ShimmerBlock(
-                          width: double.infinity,
-                          height: 160,
-                          radius: 16,
-                          isDark: isDark,
-                        )
-                      : _FeatureList(isDark: isDark),
+                  FadeSlideIn(
+                    index: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('What actually changes',
+                            style: context.text.titleMedium),
+                        const SizedBox(height: AppSpacing.md),
+                        _loading
+                            ? const Shimmer(
+                                child: SkeletonBox(height: 160, radius: AppRadius.lg))
+                            : const _FeatureList(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
-
           _CtaBar(
-            isDark: isDark,
             isYearly: _isYearly,
             loading: _loading,
             isPurchasing: _isPurchasing,
@@ -444,187 +316,111 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       ),
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────
-// Shimmer primitives (no external package needed)
-// ─────────────────────────────────────────────────────────────
-
-class _ShimmerBlock extends StatefulWidget {
-  const _ShimmerBlock({
-    required this.width,
-    required this.height,
-    required this.radius,
-    required this.isDark,
-  });
-
-  final double width;
-  final double height;
-  final double radius;
-  final bool isDark;
-
-  @override
-  State<_ShimmerBlock> createState() => _ShimmerBlockState();
-}
-
-class _ShimmerBlockState extends State<_ShimmerBlock>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final base = widget.isDark
-        ? AppColors.surfaceDark
-        : AppColors.surfaceVariant;
-    final hi = widget.isDark ? AppColors.surfaceVariantDark : AppColors.surface;
-
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, __) => Container(
-        width: widget.width,
-        height: widget.height,
-        decoration: BoxDecoration(
-          color: Color.lerp(base, hi, _anim.value)!,
-          borderRadius: BorderRadius.circular(widget.radius),
+  Widget _buildError(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Upgrade', style: context.text.titleLarge)),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xxxl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: context.c.surfaceVariant,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.wifi_off_rounded,
+                    size: 30, color: context.c.textTertiary),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text('Could not load plans',
+                  style: context.text.titleMedium, textAlign: TextAlign.center),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                _error!,
+                style: context.text.bodySmall,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              AppButton(
+                label: 'Try again',
+                icon: Icons.refresh_rounded,
+                expand: false,
+                onPressed: () {
+                  setState(() {
+                    _loading = true;
+                    _error = null;
+                  });
+                  _loadProducts();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Remaining widgets — unchanged from your existing code
-// ─────────────────────────────────────────────────────────────
-
-class _BillingToggle extends StatelessWidget {
-  const _BillingToggle({
-    required this.isYearly,
-    required this.savingPercent,
-    required this.isDark,
-    required this.onToggle,
-  });
-
-  final bool isYearly;
-  final int savingPercent;
-  final bool isDark;
-  final ValueChanged<bool> onToggle;
+// ─────────────────────────────────────────────
+// Header
+// ─────────────────────────────────────────────
+class _Header extends StatelessWidget {
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
-    final activeText = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimary;
-    final inactiveText = isDark
-        ? AppColors.textSecondaryDark
-        : AppColors.textSecondary;
-
     return Container(
-      padding: const EdgeInsets.all(4),
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceVariantDark : AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 0.8),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, Color(0xFF5A8C69)],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 24,
+            spreadRadius: -8,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => onToggle(false),
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  color: !isYearly ? bg : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  border: !isYearly
-                      ? Border.all(color: borderColor, width: 0.8)
-                      : null,
-                ),
-                child: Center(
-                  child: Text(
-                    'Monthly',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: !isYearly ? FontWeight.w500 : FontWeight.w400,
-                      color: !isYearly ? activeText : inactiveText,
-                    ),
-                  ),
-                ),
-              ),
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(Icons.workspace_premium_rounded,
+                size: 24, color: Colors.white),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            "Stop saving things\nyou'll never use",
+            style: context.text.headlineSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => onToggle(true),
-              behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  color: isYearly ? bg : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  border: isYearly
-                      ? Border.all(color: borderColor, width: 0.8)
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Yearly',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isYearly
-                            ? FontWeight.w500
-                            : FontWeight.w400,
-                        color: isYearly ? activeText : inactiveText,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryMuted,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Save $savingPercent%',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
-                          height: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Turn your saved content into something you actually come back to.',
+            style: context.text.bodyMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
         ],
@@ -633,50 +429,137 @@ class _BillingToggle extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.isDark});
-  final bool isDark;
+// ─────────────────────────────────────────────
+// Billing toggle (sliding pill)
+// ─────────────────────────────────────────────
+class _BillingToggle extends StatelessWidget {
+  const _BillingToggle({
+    required this.isYearly,
+    required this.savingPercent,
+    required this.onToggle,
+  });
+
+  final bool isYearly;
+  final int savingPercent;
+  final ValueChanged<bool> onToggle;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.primaryMuted,
-            borderRadius: BorderRadius.circular(12),
+    final c = context.c;
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: c.surfaceVariant,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: c.border, width: 0.8),
+      ),
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            duration: AppMotion.fast,
+            curve: AppMotion.emphasized,
+            alignment:
+                isYearly ? Alignment.centerRight : Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: 0.5,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: c.surface,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  border: Border.all(color: c.border, width: 0.8),
+                ),
+              ),
+            ),
           ),
-          child: const Icon(
-            Icons.bookmark_rounded,
-            size: 22,
-            color: AppColors.primary,
+          Row(
+            children: [
+              Expanded(
+                child: _ToggleLabel(
+                  label: 'Monthly',
+                  selected: !isYearly,
+                  onTap: () => onToggle(false),
+                ),
+              ),
+              Expanded(
+                child: _ToggleLabel(
+                  label: 'Yearly',
+                  selected: isYearly,
+                  onTap: () => onToggle(true),
+                  badge: savingPercent > 0 ? 'Save $savingPercent%' : null,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Stop saving things\nyou’ll never use',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Turn your saved content into something you actually come back to.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
+class _ToggleLabel extends StatelessWidget {
+  const _ToggleLabel({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.badge,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: context.text.labelMedium?.copyWith(
+              color: selected ? c.textPrimary : c.textSecondary,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            ),
+          ),
+          if (badge != null) ...[
+            const SizedBox(width: AppSpacing.xs + 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: c.primarySurface,
+                borderRadius: BorderRadius.circular(AppRadius.xs - 2),
+              ),
+              child: Text(
+                badge!,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                  height: 1,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Plan card
+// ─────────────────────────────────────────────
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.title,
     required this.price,
     required this.period,
     required this.features,
-    required this.isDark,
     this.isActive = false,
     this.highlight = false,
     this.perMonthNote,
@@ -687,36 +570,37 @@ class _PlanCard extends StatelessWidget {
   final String period;
   final String? perMonthNote;
   final List<String> features;
-  final bool isDark;
   final bool isActive;
   final bool highlight;
 
   @override
   Widget build(BuildContext context) {
-    final bg = highlight
-        ? AppColors.primaryMuted
-        : (isDark ? AppColors.surfaceDark : AppColors.surface);
-    final borderColor = highlight
-        ? AppColors.primaryLight
-        : (isDark ? AppColors.borderDark : AppColors.border);
-    final titleColor = highlight
-        ? AppColors.primary
-        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary);
-    final priceColor = highlight
-        ? AppColors.primary
-        : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary);
-    final featureColor = highlight
-        ? AppColors.primary
-        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondary);
-    final checkColor = highlight ? AppColors.primary : AppColors.textTertiary;
+    final c = context.c;
+    final titleColor = highlight ? c.primary : c.textSecondary;
+    final priceColor = highlight ? c.primary : c.textPrimary;
+    final featureColor = highlight ? c.primary : c.textSecondary;
+    final checkColor = highlight ? c.primary : c.textTertiary;
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.all(14),
+      duration: AppMotion.fast,
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: highlight ? 1.5 : 0.8),
+        gradient: highlight
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  c.primarySurface,
+                  Color.lerp(c.primarySurface, c.surface, 0.45)!,
+                ],
+              )
+            : null,
+        color: highlight ? null : c.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: highlight ? AppColors.primary : c.border,
+          width: highlight ? 1.4 : 0.8,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -725,12 +609,12 @@ class _PlanCard extends StatelessWidget {
             title.toUpperCase(),
             style: TextStyle(
               fontSize: 11,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
               color: titleColor,
               letterSpacing: 0.8,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           RichText(
             text: TextSpan(
               children: [
@@ -738,7 +622,7 @@ class _PlanCard extends StatelessWidget {
                   text: price,
                   style: TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                     color: priceColor,
                     height: 1.1,
                   ),
@@ -760,12 +644,11 @@ class _PlanCard extends StatelessWidget {
               perMonthNote!,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w400,
-                color: titleColor.withValues(alpha: 0.7),
+                color: titleColor.withValues(alpha: 0.75),
               ),
             ),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.md),
           ...features.map(
             (f) => Padding(
               padding: const EdgeInsets.only(bottom: 7),
@@ -774,19 +657,14 @@ class _PlanCard extends StatelessWidget {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(top: 1),
-                    child: Icon(
-                      Icons.check_rounded,
-                      size: 13,
-                      color: checkColor,
-                    ),
+                    child: Icon(Icons.check_rounded, size: 13, color: checkColor),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: AppSpacing.xs + 2),
                   Expanded(
                     child: Text(
                       f,
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.w400,
                         color: featureColor,
                         height: 1.4,
                       ),
@@ -797,23 +675,22 @@ class _PlanCard extends StatelessWidget {
             ),
           ),
           if (isActive) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm, vertical: 4),
               decoration: BoxDecoration(
-                color: isDark
-                    ? AppColors.surfaceVariantDark
-                    : AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(6),
+                color: highlight
+                    ? Colors.white.withValues(alpha: 0.6)
+                    : c.surfaceVariant,
+                borderRadius: BorderRadius.circular(AppRadius.xs),
               ),
               child: Text(
                 'Current plan',
                 style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w400,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondary,
+                  color: highlight ? c.primary : c.textSecondary,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -824,18 +701,20 @@ class _PlanCard extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────
+// Feature list
+// ─────────────────────────────────────────────
 class _FeatureList extends StatelessWidget {
-  const _FeatureList({required this.isDark});
-  final bool isDark;
+  const _FeatureList();
 
   static const _features = [
     (
       title: 'Flexible organization',
-      subtitle: 'Structure your ideas in a way that actually makes sense to you',
+      subtitle: 'Structure your ideas in a way that makes sense to you',
     ),
     (
       title: 'Right-time reminders',
-      subtitle: 'Your content comes back when you actually have time for it',
+      subtitle: 'Your content comes back when you actually have time',
     ),
     (
       title: 'Full control',
@@ -843,25 +722,19 @@ class _FeatureList extends StatelessWidget {
     ),
     (
       title: 'Clarity on your behavior',
-      subtitle: 'See what you use, what you ignore, and what truly matters',
+      subtitle: 'See what you use, ignore, and what truly matters',
     ),
     (
       title: 'Weekly reset',
-      subtitle: 'A simple loop that keeps your saved content alive and useful',
+      subtitle: 'A simple loop that keeps your saved content alive',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 0.8),
-      ),
+    final c = context.c;
+    return AppCard(
+      padding: EdgeInsets.zero,
       child: Column(
         children: List.generate(_features.length, (i) {
           final f = _features[i];
@@ -869,39 +742,28 @@ class _FeatureList extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 28,
-                      height: 28,
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
-                        color: AppColors.primaryMuted,
-                        borderRadius: BorderRadius.circular(8),
+                        color: c.primarySurface,
+                        borderRadius: BorderRadius.circular(AppRadius.sm),
                       ),
-                      child: const Icon(
-                        Icons.check_rounded,
-                        size: 15,
-                        color: AppColors.primary,
-                      ),
+                      child: const Icon(Icons.check_rounded,
+                          size: 16, color: AppColors.primary),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            f.title,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
+                          Text(f.title, style: context.text.titleSmall),
                           const SizedBox(height: 2),
-                          Text(
-                            f.subtitle,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
+                          Text(f.subtitle, style: context.text.bodySmall),
                         ],
                       ),
                     ),
@@ -912,9 +774,9 @@ class _FeatureList extends StatelessWidget {
                 Divider(
                   height: 0,
                   thickness: 0.8,
-                  color: borderColor,
+                  color: c.border,
                   indent: 56,
-                  endIndent: 16,
+                  endIndent: AppSpacing.lg,
                 ),
             ],
           );
@@ -924,9 +786,11 @@ class _FeatureList extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────
+// Sticky CTA bar
+// ─────────────────────────────────────────────
 class _CtaBar extends StatelessWidget {
   const _CtaBar({
-    required this.isDark,
     required this.isYearly,
     required this.loading,
     required this.isPurchasing,
@@ -937,7 +801,6 @@ class _CtaBar extends StatelessWidget {
     required this.onRestore,
   });
 
-  final bool isDark;
   final bool isYearly;
   final bool loading;
   final bool isPurchasing;
@@ -949,51 +812,109 @@ class _CtaBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
+    final c = context.c;
+    final busy = loading || isPurchasing;
 
     return Container(
       decoration: BoxDecoration(
-        color: surfaceColor,
-        border: Border(top: BorderSide(color: borderColor, width: 0.8)),
+        color: c.surface,
+        border: Border(top: BorderSide(color: c.border, width: 0.8)),
       ),
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.screen,
+        AppSpacing.md,
+        AppSpacing.screen,
+        AppSpacing.md + MediaQuery.of(context).padding.bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: loading ? null : onPressed,
-              child: loading || isPurchasing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text('Upgrade to Premium  ·  $displayPrice$displayPeriod'),
-            ),
+          _GradientCta(
+            busy: busy,
+            label: 'Upgrade to Premium  ·  $displayPrice$displayPeriod',
+            onPressed: loading ? null : onPressed,
           ),
-
-          const SizedBox(height: 8),
-
+          const SizedBox(height: AppSpacing.sm),
           Text(
             isYearly
                 ? '$perMonthNote · Cancel anytime'
                 : 'Billed monthly · Cancel anytime · Secure payment',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelSmall,
+            style: context.text.labelSmall,
           ),
-
           TextButton(
             onPressed: isPurchasing ? null : onRestore,
-            child: const Text("Restore purchases"),
+            child: const Text('Restore purchases'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GradientCta extends StatelessWidget {
+  const _GradientCta({
+    required this.label,
+    required this.busy,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool busy;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null && !busy;
+    return PressableScale(
+      onTap: enabled
+          ? () {
+              HapticFeedback.lightImpact();
+              onPressed!();
+            }
+          : null,
+      pressedScale: 0.97,
+      child: AnimatedOpacity(
+        opacity: enabled ? 1 : 0.7,
+        duration: AppMotion.fast,
+        child: Container(
+          height: 54,
+          width: double.infinity,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.primary, Color(0xFF5A8C69)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.35),
+                blurRadius: 18,
+                spreadRadius: -2,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: busy
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+              : Text(
+                  label,
+                  style: context.text.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+        ),
       ),
     );
   }
