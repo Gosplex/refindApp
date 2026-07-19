@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/theme/app_spacing.dart';
+import '../core/theme/colors.dart';
+import '../core/theme/theme_x.dart';
+import '../core/widgets/motion.dart';
 import '../features/analytics/screens/analytic_screen.dart';
 import '../features/collection/screen/collection_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../core/theme/colors.dart';
 
 class BottomNav extends StatefulWidget {
   const BottomNav({super.key});
@@ -14,9 +17,7 @@ class BottomNav extends StatefulWidget {
   State<BottomNav> createState() => _BottomNavState();
 }
 
-class _BottomNavState extends State<BottomNav>
-    with SingleTickerProviderStateMixin {
-
+class _BottomNavState extends State<BottomNav> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
@@ -27,26 +28,10 @@ class _BottomNavState extends State<BottomNav>
   ];
 
   static const List<_NavItem> _items = [
-    _NavItem(
-      label:         'Home',
-      icon:          Icons.home_outlined,
-      activeIcon:    Icons.home_rounded,
-    ),
-    _NavItem(
-      label:      'Collections',
-      icon:       Icons.folder_outlined,
-      activeIcon: Icons.folder_rounded,
-    ),
-    _NavItem(
-      label:      'Analytics',
-      icon:       Icons.bar_chart_outlined,
-      activeIcon: Icons.bar_chart_rounded,
-    ),
-    _NavItem(
-      label:         'Settings',
-      icon:          Icons.settings_outlined,
-      activeIcon:    Icons.settings_rounded,
-    ),
+    _NavItem('Home', Icons.home_outlined, Icons.home_rounded),
+    _NavItem('Collections', Icons.folder_outlined, Icons.folder_rounded),
+    _NavItem('Analytics', Icons.bar_chart_outlined, Icons.bar_chart_rounded),
+    _NavItem('Settings', Icons.settings_outlined, Icons.settings_rounded),
   ];
 
   void _onTap(int index) {
@@ -57,168 +42,141 @@ class _BottomNavState extends State<BottomNav>
 
   @override
   Widget build(BuildContext context) {
-    final isDark     = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final borderColor  = isDark ? AppColors.borderDark  : AppColors.border;
-
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: IndexedStack(index: _currentIndex, children: _screens),
+      bottomNavigationBar: _FloatingNavBar(
+        items: _items,
+        currentIndex: _currentIndex,
+        onTap: _onTap,
       ),
-      bottomNavigationBar: Container(
+    );
+  }
+}
+
+/// A floating, rounded navigation bar with an expanding-pill selected tab.
+class _FloatingNavBar extends StatelessWidget {
+  const _FloatingNavBar({
+    required this.items,
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  final List<_NavItem> items;
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.md),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
         decoration: BoxDecoration(
-          color: surfaceColor,
-          border: Border(
-            top: BorderSide(color: borderColor, width: 0.8),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 60,
-            child: Row(
-              children: List.generate(_items.length, (index) {
-                final item     = _items[index];
-                final selected = index == _currentIndex;
-                return Expanded(
-                  child: _NavTile(
-                    item:     item,
-                    selected: selected,
-                    onTap:    () => _onTap(index),
-                    isDark:   isDark,
-                  ),
-                );
-              }),
+          color: c.surface,
+          borderRadius: BorderRadius.circular(AppRadius.xxl),
+          border: Border.all(color: c.border, width: 0.8),
+          boxShadow: [
+            BoxShadow(
+              color: c.shadow,
+              blurRadius: 28,
+              spreadRadius: -8,
+              offset: const Offset(0, 12),
             ),
-          ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(items.length, (i) {
+            return _NavTile(
+              item: items[i],
+              selected: i == currentIndex,
+              onTap: () => onTap(i),
+            );
+          }),
         ),
       ),
     );
   }
 }
 
-
-class _NavTile extends StatefulWidget {
+class _NavTile extends StatelessWidget {
   const _NavTile({
     required this.item,
     required this.selected,
     required this.onTap,
-    required this.isDark,
   });
 
-  final _NavItem  item;
-  final bool     selected;
+  final _NavItem item;
+  final bool selected;
   final VoidCallback onTap;
-  final bool     isDark;
-
-  @override
-  State<_NavTile> createState() => _NavTileState();
-}
-
-class _NavTileState extends State<_NavTile>
-    with SingleTickerProviderStateMixin {
-
-  late final AnimationController _controller;
-  late final Animation<double>  _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync:    this,
-      duration: const Duration(milliseconds: 180),
-    );
-    _scale = Tween<double>(begin: 1.0, end: 0.88).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-  }
-
-
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onTapDown(TapDownDetails _) => _controller.forward();
-  void _onTapUp(TapUpDetails _)   => _controller.reverse();
-  void _onTapCancel()               => _controller.reverse();
 
   @override
   Widget build(BuildContext context) {
-    final activeColor   = AppColors.primary;
-    final inactiveColor = widget.isDark
-        ? AppColors.textSecondaryDark
-        : AppColors.textSecondary;
+    final c = context.c;
+    final activeColor = AppColors.primary;
+    final inactiveColor = c.textSecondary;
 
-    return GestureDetector(
-      onTap:       widget.onTap,
-      onTapDown:   _onTapDown,
-      onTapUp:     _onTapUp,
-      onTapCancel: _onTapCancel,
-      behavior:    HitTestBehavior.opaque,
-      child: ScaleTransition(
-        scale: _scale,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve:    Curves.easeOut,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve:    Curves.easeOut,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical:   4,
-                ),
-                decoration: BoxDecoration(
-                  color: widget.selected
-                      ? AppColors.primaryMuted
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  widget.selected ? widget.item.activeIcon : widget.item.icon,
-                  size:  22,
-                  color: widget.selected ? activeColor : inactiveColor,
-                ),
+    return PressableScale(
+      onTap: onTap,
+      pressedScale: 0.9,
+      child: AnimatedContainer(
+        duration: AppMotion.medium,
+        curve: AppMotion.emphasized,
+        padding: EdgeInsets.symmetric(
+          horizontal: selected ? AppSpacing.lg : AppSpacing.md,
+          vertical: 10,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? c.primarySurface : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedSwitcher(
+              duration: AppMotion.fast,
+              transitionBuilder: (child, anim) =>
+                  ScaleTransition(scale: anim, child: child),
+              child: Icon(
+                selected ? item.activeIcon : item.icon,
+                key: ValueKey(selected),
+                size: 23,
+                color: selected ? activeColor : inactiveColor,
               ),
-
-              const SizedBox(height: 3),
-
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  fontSize:   11,
-                  fontWeight: widget.selected
-                      ? FontWeight.w500
-                      : FontWeight.w400,
-                  color: widget.selected ? activeColor : inactiveColor,
-                ),
-                child: Text(widget.item.label),
-              ),
-
-            ],
-          ),
+            ),
+            // Label expands into view only when selected.
+            AnimatedSize(
+              duration: AppMotion.medium,
+              curve: AppMotion.emphasized,
+              child: selected
+                  ? Padding(
+                      padding: const EdgeInsets.only(left: AppSpacing.sm),
+                      child: Text(
+                        item.label,
+                        style: context.text.labelMedium?.copyWith(
+                          color: activeColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-
 class _NavItem {
-  const _NavItem({
-    required this.label,
-    required this.icon,
-    required this.activeIcon,
-  });
+  const _NavItem(this.label, this.icon, this.activeIcon);
 
-  final String   label;
+  final String label;
   final IconData icon;
   final IconData activeIcon;
 }
