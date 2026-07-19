@@ -953,11 +953,16 @@ class _SwitchRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
-        value: value,
-        onChanged: onChanged,
+      // Transparent Material so the ListTile has a Material ancestor to paint
+      // its ink/selection on, while the section card's background still shows.
+      child: Material(
+        type: MaterialType.transparency,
+        child: SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
+          value: value,
+          onChanged: onChanged,
+        ),
       ),
     );
   }
