@@ -6,6 +6,7 @@ import '../../../core/theme/colors.dart';
 import '../../../core/theme/theme_x.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../limitGuard/usage_provider.dart';
+import '../../../services/in_app_purchase_service.dart';
 import '../../subscription/subscription_screen.dart';
 import '../collection_controller.dart';
 import '../models/collection_model.dart';
@@ -121,13 +122,22 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
             style: context.text.bodySmall,
           ),
           const SizedBox(height: AppSpacing.xl),
-          AppButton(
-            label: 'Upgrade for unlimited collections',
-            icon: Icons.auto_awesome_rounded,
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+          StreamBuilder<bool>(
+            stream: InAppPurchaseService().proStatusStream,
+            initialData: InAppPurchaseService().isPro,
+            builder: (context, snapshot) {
+              final isPro = snapshot.data ?? false;
+              if (isPro) return const SizedBox.shrink();
+              return AppButton(
+                label: 'Upgrade for unlimited collections',
+                icon: Icons.auto_awesome_rounded,
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const SubscriptionScreen()),
+                  );
+                },
               );
             },
           ),
