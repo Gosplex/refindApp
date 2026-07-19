@@ -1,7 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/theme_x.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../subscription/subscription_screen.dart';
 
 class AnalyticsLockWrapper extends StatelessWidget {
@@ -14,113 +17,69 @@ class AnalyticsLockWrapper extends StatelessWidget {
     required this.child,
   });
 
+  void _openPaywall(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isPro) return child;
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.c;
 
     return Stack(
       children: [
         child,
-
         Positioned.fill(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.lg),
             child: Stack(
               children: [
-                /// 🔥 REAL BLUR LAYER
                 BackdropFilter(
-                  filter: ImageFilter.blur(
-                    sigmaX: 14,
-                    sigmaY: 14,
-                  ),
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
                   child: Container(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                   ),
                 ),
-
-                /// 🔒 CONTENT
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const SubscriptionScreen(),
-                      ),
-                    );
-                  },
+                  onTap: () => _openPaywall(context),
                   child: Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     alignment: Alignment.center,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        /// ICON
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(AppSpacing.md),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryMuted,
-                            borderRadius: BorderRadius.circular(12),
+                            color: c.primarySurface,
+                            borderRadius: BorderRadius.circular(AppRadius.md),
                           ),
-                          child: const Icon(
-                            Icons.insights_rounded,
-                            size: 22,
-                            color: AppColors.primary,
-                          ),
+                          child: const Icon(Icons.insights_rounded,
+                              size: 24, color: AppColors.primary),
                         ),
-
-                        const SizedBox(height: 16),
-
-                        /// HEADLINE
+                        const SizedBox(height: AppSpacing.lg),
                         Text(
                           "See what's actually working",
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: context.text.titleMedium,
                           textAlign: TextAlign.center,
                         ),
-
-                        const SizedBox(height: 6),
-
-                        /// DESCRIPTION
+                        const SizedBox(height: AppSpacing.xs + 2),
                         Text(
-                          "You're saving links… but are you actually using them?\nUnlock deeper insights into your habits.",
-                          style: Theme.of(context).textTheme.bodySmall,
+                          "You're saving links… but are you using them?\nUnlock deeper insight into your habits.",
+                          style: context.text.bodySmall,
                           textAlign: TextAlign.center,
                         ),
-
-                        const SizedBox(height: 18),
-
-                        /// CTA BUTTON
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                const SubscriptionScreen(),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              "Unlock Insights",
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelLarge
-                                  ?.copyWith(
-                                color: AppColors.onPrimary,
-                              ),
-                            ),
-                          ),
+                        const SizedBox(height: AppSpacing.lg),
+                        AppButton(
+                          label: 'Unlock insights',
+                          icon: Icons.auto_awesome_rounded,
+                          expand: false,
+                          onPressed: () => _openPaywall(context),
                         ),
                       ],
                     ),

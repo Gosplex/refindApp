@@ -1,7 +1,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/colors.dart';
+import '../../../core/theme/theme_x.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../services/in_app_purchase_service.dart';
 import '../analytics_controller.dart';
 import '../models/analytics_model.dart';
@@ -18,7 +21,8 @@ class AnalyticsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Analytics', style: Theme.of(context).textTheme.titleLarge),
+        titleSpacing: AppSpacing.screen,
+        title: Text('Analytics', style: context.text.titleLarge),
       ),
       body: StreamBuilder<AnalyticsModel>(
         stream: controller.getAnalyticsStream(),
@@ -26,177 +30,140 @@ class AnalyticsScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const AnalyticsShimmer();
           }
-
           if (!snapshot.hasData) {
-            return const _EmptyState();
+            return const EmptyState(
+              icon: Icons.insights_rounded,
+              title: 'No analytics yet',
+              message: 'Save and revisit links to unlock insights on your habits.',
+            );
           }
 
           final data = snapshot.data!;
-          final isDark = Theme.of(context).brightness == Brightness.dark;
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screen, AppSpacing.md, AppSpacing.screen, 100),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                /// ───────── HERO CARD (Revisit Rate) ─────────
-                _HeroCard(revisitRate: data.revisitRate),
-
-                const SizedBox(height: 20),
-
-                /// ───────── QUICK STATS ─────────
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.bookmark_border_rounded,
-                        title: "Backlog",
-                        value: data.backlogCount.toString(),
-                        subtitle: "Unopened links",
-                        isDark: isDark,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.local_fire_department_rounded,
-                        title: "Streak",
-                        value: "${data.currentStreak}",
-                        subtitle: "Days active",
-                        isDark: isDark,
-                        iconColor: AppColors.warning,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                AnalyticsLockWrapper(
-                  isPro: isPro,
-                  child: Column(
+                FadeSlideIn(child: _HeroCard(revisitRate: data.revisitRate)),
+                const SizedBox(height: AppSpacing.md),
+                FadeSlideIn(
+                  index: 1,
+                  child: Row(
                     children: [
-                      /// ───────── WEEKLY ACTIVITY ─────────
-                      const _SectionHeader(title: "Weekly Activity"),
-                      const SizedBox(height: 12),
-
-                      _WeeklyChart(
-                        saved: data.weeklySaved,
-                        revisited: data.weeklyRevisited,
-                        isDark: isDark,
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.bookmark_border_rounded,
+                          value: data.backlogCount,
+                          label: 'Backlog',
+                          subtitle: 'Unopened links',
+                        ),
                       ),
-
-                      const SizedBox(height: 12),
-
-                      _ImprovementCard(
-                        improvement: data.weeklyImprovement,
-                        isDark: isDark,
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.local_fire_department_rounded,
+                          value: data.currentStreak,
+                          label: 'Streak',
+                          subtitle: 'Days active',
+                          iconColor: AppColors.warning,
+                        ),
                       ),
-
-                      const SizedBox(height: 24),
-
-                      /// ───────── REMINDERS ─────────
-                      // const _SectionHeader(title: "Reminders"),
-                      // const SizedBox(height: 12),
-                      //
-                      // _ReminderEffectivenessCard(
-                      //   total: data.totalReminders,
-                      //   worked: data.revisitedAfterReminder,
-                      //   effectiveness: data.reminderEffectiveness,
-                      //   isDark: isDark,
-                      // ),
-                      const SizedBox(height: 24),
-
-                      /// ───────── TIME INSIGHTS ─────────
-                      const _SectionHeader(title: "Time Insights"),
-                      const SizedBox(height: 12),
-
-                      _TimeCard(
-                        avgDays: data.avgTimeToRevisitDays,
-                        isDark: isDark,
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      /// ───────── COLLECTIONS ─────────
-                      if (data.topCollection != null ||
-                          data.leastUsedCollection != null) ...[
-                        const _SectionHeader(title: "Collections"),
-                        const SizedBox(height: 12),
-
-                        if (data.topCollection != null)
-                          _InfoCard(
-                            icon: Icons.folder_rounded,
-                            label: "Most used",
-                            value: data.topCollection!,
-                            isDark: isDark,
-                          ),
-
-                        if (data.topCollection != null &&
-                            data.leastUsedCollection != null)
-                          const SizedBox(height: 10),
-
-                        if (data.leastUsedCollection != null)
-                          _InfoCard(
-                            icon: Icons.folder_outlined,
-                            label: "Least used",
-                            value: data.leastUsedCollection!,
-                            isDark: isDark,
-                            isSecondary: true,
-                          ),
-
-                        const SizedBox(height: 24),
-                      ],
-
-                      /// ───────── SOURCES ─────────
-                      if (data.topSavedSource != null ||
-                          data.topRevisitedSource != null) ...[
-                        const _SectionHeader(title: "Sources"),
-                        const SizedBox(height: 12),
-
-                        if (data.topSavedSource != null)
-                          _InfoCard(
-                            icon: Icons.link_rounded,
-                            label: "Top saved from",
-                            value: data.topSavedSource!,
-                            isDark: isDark,
-                          ),
-
-                        if (data.topSavedSource != null &&
-                            data.topRevisitedSource != null)
-                          const SizedBox(height: 10),
-
-                        if (data.topRevisitedSource != null)
-                          _InfoCard(
-                            icon: Icons.open_in_new_rounded,
-                            label: "Most revisited",
-                            value: data.topRevisitedSource!,
-                            isDark: isDark,
-                          ),
-
-                        const SizedBox(height: 24),
-                      ],
-
-                      /// ───────── TOP LINKS ─────────
-                      if (data.topLinks.isNotEmpty) ...[
-                        const _SectionHeader(title: "Top Links"),
-                        const SizedBox(height: 12),
-
-                        ...data.topLinks.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final link = entry.value;
-
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _TopLinkCard(
-                              link: link,
-                              rank: index + 1,
-                              isDark: isDark,
-                            ),
-                          );
-                        }),
-                      ],
                     ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                FadeSlideIn(
+                  index: 2,
+                  child: AnalyticsLockWrapper(
+                    isPro: isPro,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SectionHeader(
+                            title: 'Weekly activity',
+                            padding: EdgeInsets.zero),
+                        const SizedBox(height: AppSpacing.md),
+                        _WeeklyChart(
+                          saved: data.weeklySaved,
+                          revisited: data.weeklyRevisited,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        _ImprovementCard(improvement: data.weeklyImprovement),
+                        const SizedBox(height: AppSpacing.xxl),
+
+                        const SectionHeader(
+                            title: 'Time insights', padding: EdgeInsets.zero),
+                        const SizedBox(height: AppSpacing.md),
+                        _TimeCard(avgDays: data.avgTimeToRevisitDays),
+                        const SizedBox(height: AppSpacing.xxl),
+
+                        if (data.topCollection != null ||
+                            data.leastUsedCollection != null) ...[
+                          const SectionHeader(
+                              title: 'Collections',
+                              padding: EdgeInsets.zero),
+                          const SizedBox(height: AppSpacing.md),
+                          if (data.topCollection != null)
+                            _InfoCard(
+                              icon: Icons.folder_rounded,
+                              label: 'Most used',
+                              value: data.topCollection!,
+                            ),
+                          if (data.topCollection != null &&
+                              data.leastUsedCollection != null)
+                            const SizedBox(height: AppSpacing.sm),
+                          if (data.leastUsedCollection != null)
+                            _InfoCard(
+                              icon: Icons.folder_outlined,
+                              label: 'Least used',
+                              value: data.leastUsedCollection!,
+                              isSecondary: true,
+                            ),
+                          const SizedBox(height: AppSpacing.xxl),
+                        ],
+
+                        if (data.topSavedSource != null ||
+                            data.topRevisitedSource != null) ...[
+                          const SectionHeader(
+                              title: 'Sources', padding: EdgeInsets.zero),
+                          const SizedBox(height: AppSpacing.md),
+                          if (data.topSavedSource != null)
+                            _InfoCard(
+                              icon: Icons.link_rounded,
+                              label: 'Top saved from',
+                              value: data.topSavedSource!,
+                            ),
+                          if (data.topSavedSource != null &&
+                              data.topRevisitedSource != null)
+                            const SizedBox(height: AppSpacing.sm),
+                          if (data.topRevisitedSource != null)
+                            _InfoCard(
+                              icon: Icons.open_in_new_rounded,
+                              label: 'Most revisited',
+                              value: data.topRevisitedSource!,
+                            ),
+                          const SizedBox(height: AppSpacing.xxl),
+                        ],
+
+                        if (data.topLinks.isNotEmpty) ...[
+                          const SectionHeader(
+                              title: 'Top links', padding: EdgeInsets.zero),
+                          const SizedBox(height: AppSpacing.md),
+                          ...data.topLinks.asMap().entries.map((entry) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: AppSpacing.sm),
+                              child: _TopLinkCard(
+                                link: entry.value,
+                                rank: entry.key + 1,
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -208,27 +175,51 @@ class AnalyticsScreen extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────
-/// HERO CARD
-/// ─────────────────────────────────────────────
-class _HeroCard extends StatelessWidget {
-  final double revisitRate;
+/// Animated number that counts up from zero on first paint.
+class _CountUp extends StatelessWidget {
+  const _CountUp({required this.value, required this.format, this.style});
 
-  const _HeroCard({required this.revisitRate});
+  final double value;
+  final String Function(double) format;
+  final TextStyle? style;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: value),
+      duration: AppMotion.slow,
+      curve: AppMotion.standard,
+      builder: (context, v, _) => Text(format(v), style: style),
+    );
+  }
+}
 
+/// ───────── Hero: revisit rate ─────────
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({required this.revisitRate});
+
+  final double revisitRate;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border, width: 0.8),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, Color(0xFF5A8C69)],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 24,
+            spreadRadius: -8,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,36 +227,37 @@ class _HeroCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(AppSpacing.sm),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryMuted,
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: const Icon(
-                  Icons.trending_up_rounded,
-                  size: 22,
-                  color: AppColors.primary,
-                ),
+                child: const Icon(Icons.trending_up_rounded,
+                    size: 20, color: Colors.white),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Text(
-                "Revisit Rate",
-                style: Theme.of(context).textTheme.titleMedium,
+                'Revisit rate',
+                style: context.text.titleMedium?.copyWith(color: Colors.white),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            "${revisitRate.toStringAsFixed(1)}%",
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w600,
+          const SizedBox(height: AppSpacing.lg),
+          _CountUp(
+            value: revisitRate,
+            format: (v) => '${v.toStringAsFixed(1)}%',
+            style: context.text.headlineLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 40,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.xs),
           Text(
-            "How often you actually return to saved links",
-            style: Theme.of(context).textTheme.bodySmall,
+            'How often you actually return to saved links',
+            style: context.text.bodySmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
           ),
         ],
       ),
@@ -273,99 +265,93 @@ class _HeroCard extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────
-/// STAT CARD
-/// ─────────────────────────────────────────────
+/// ───────── Quick stat ─────────
 class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final String subtitle;
-  final bool isDark;
-  final Color? iconColor;
-
   const _StatCard({
     required this.icon,
-    required this.title,
     required this.value,
+    required this.label,
     required this.subtitle,
-    required this.isDark,
     this.iconColor,
   });
 
+  final IconData icon;
+  final int value;
+  final String label;
+  final String subtitle;
+  final Color? iconColor;
+
   @override
   Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border, width: 0.8),
-      ),
+    final c = context.c;
+    final color = iconColor ?? c.primary;
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 24, color: iconColor ?? AppColors.primary),
-          const SizedBox(height: 12),
-          Text(value, style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 4),
-          Text(subtitle, style: Theme.of(context).textTheme.labelSmall),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _CountUp(
+            value: value.toDouble(),
+            format: (v) => v.round().toString(),
+            style: context.text.headlineMedium,
+          ),
+          const SizedBox(height: 2),
+          Text(label, style: context.text.titleSmall),
+          Text(subtitle, style: context.text.bodySmall),
         ],
       ),
     );
   }
 }
 
-/// ─────────────────────────────────────────────
-/// WEEKLY CHART
-/// ─────────────────────────────────────────────
+/// ───────── Weekly bar chart ─────────
 class _WeeklyChart extends StatelessWidget {
+  const _WeeklyChart({required this.saved, required this.revisited});
+
   final int saved;
   final int revisited;
-  final bool isDark;
-
-  const _WeeklyChart({
-    required this.saved,
-    required this.revisited,
-    required this.isDark,
-  });
 
   @override
   Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-
+    final c = context.c;
     final maxValue = (saved > revisited ? saved : revisited).toDouble();
-    final normalizedMax = maxValue == 0 ? 10.0 : maxValue * 1.2;
+    final normalizedMax = maxValue == 0 ? 10.0 : maxValue * 1.25;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border, width: 0.8),
-      ),
+    BarChartRodData rod(double y, Color color) => BarChartRodData(
+          toY: y,
+          width: 42,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [color.withValues(alpha: 0.75), color],
+          ),
+        );
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _ChartLegend(
-                color: AppColors.primary,
-                label: "Saved",
-                value: saved.toString(),
-              ),
+                  color: c.primary, label: 'Saved', value: '$saved'),
               _ChartLegend(
-                color: AppColors.primaryLight,
-                label: "Revisited",
-                value: revisited.toString(),
-              ),
+                  color: c.primaryLight,
+                  label: 'Revisited',
+                  value: '$revisited'),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xl),
           SizedBox(
             height: 180,
             child: BarChart(
@@ -379,15 +365,13 @@ class _WeeklyChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        final labels = ['Saved', 'Revisited'];
+                        const labels = ['Saved', 'Revisited'];
                         if (value.toInt() >= 0 &&
                             value.toInt() < labels.length) {
                           return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              labels[value.toInt()],
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
+                            padding: const EdgeInsets.only(top: AppSpacing.sm),
+                            child: Text(labels[value.toInt()],
+                                style: context.text.labelSmall),
                           );
                         }
                         return const SizedBox.shrink();
@@ -395,51 +379,26 @@ class _WeeklyChart extends StatelessWidget {
                     ),
                   ),
                   leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                      sideTitles: SideTitles(showTitles: false)),
                   topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                      sideTitles: SideTitles(showTitles: false)),
                   rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                      sideTitles: SideTitles(showTitles: false)),
                 ),
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
                   horizontalInterval: normalizedMax / 4,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(color: border, strokeWidth: 0.8);
-                  },
+                  getDrawingHorizontalLine: (value) =>
+                      FlLine(color: c.border, strokeWidth: 0.8),
                 ),
                 borderData: FlBorderData(show: false),
                 barGroups: [
                   BarChartGroupData(
-                    x: 0,
-                    barRods: [
-                      BarChartRodData(
-                        toY: saved.toDouble(),
-                        color: AppColors.primary,
-                        width: 40,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(6),
-                        ),
-                      ),
-                    ],
-                  ),
+                      x: 0, barRods: [rod(saved.toDouble(), c.primary)]),
                   BarChartGroupData(
-                    x: 1,
-                    barRods: [
-                      BarChartRodData(
-                        toY: revisited.toDouble(),
-                        color: AppColors.primaryLight,
-                        width: 40,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(6),
-                        ),
-                      ),
-                    ],
-                  ),
+                      x: 1,
+                      barRods: [rod(revisited.toDouble(), c.primaryLight)]),
                 ],
               ),
             ),
@@ -451,15 +410,15 @@ class _WeeklyChart extends StatelessWidget {
 }
 
 class _ChartLegend extends StatelessWidget {
-  final Color color;
-  final String label;
-  final String value;
-
   const _ChartLegend({
     required this.color,
     required this.label,
     required this.value,
   });
+
+  final Color color;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
@@ -470,269 +429,57 @@ class _ChartLegend extends StatelessWidget {
           height: 12,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(AppRadius.xs - 2),
           ),
         ),
-        const SizedBox(width: 6),
-        Text(label, style: Theme.of(context).textTheme.labelMedium),
-        const SizedBox(width: 4),
-        Text("($value)", style: Theme.of(context).textTheme.labelSmall),
+        const SizedBox(width: AppSpacing.sm),
+        Text(label, style: context.text.labelMedium),
+        const SizedBox(width: AppSpacing.xs),
+        Text('($value)', style: context.text.labelSmall),
       ],
     );
   }
 }
 
-/// ─────────────────────────────────────────────
-/// IMPROVEMENT CARD
-/// ─────────────────────────────────────────────
+/// ───────── Improvement vs last week ─────────
 class _ImprovementCard extends StatelessWidget {
+  const _ImprovementCard({required this.improvement});
+
   final double improvement;
-  final bool isDark;
-
-  const _ImprovementCard({required this.improvement, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-
+    final c = context.c;
     final isPositive = improvement >= 0;
-    final color = isPositive ? AppColors.success : AppColors.error;
-    final icon = isPositive
-        ? Icons.trending_up_rounded
-        : Icons.trending_down_rounded;
+    final color = isPositive ? c.success : c.error;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border, width: 0.8),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "vs last week",
-                  style: Theme.of(context).textTheme.labelSmall,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  "${isPositive ? '+' : ''}${improvement.toStringAsFixed(1)}%",
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(color: color),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// ─────────────────────────────────────────────
-/// REMINDER EFFECTIVENESS CARD
-/// ─────────────────────────────────────────────
-class _ReminderEffectivenessCard extends StatelessWidget {
-  final int total;
-  final int worked;
-  final double effectiveness;
-  final bool isDark;
-
-  const _ReminderEffectivenessCard({
-    required this.total,
-    required this.worked,
-    required this.effectiveness,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border, width: 0.8),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _ReminderStat(
-                icon: Icons.notifications_outlined,
-                label: "Sent",
-                value: total.toString(),
-              ),
-              Container(width: 1, height: 40, color: border),
-              _ReminderStat(
-                icon: Icons.check_circle_outline,
-                label: "Worked",
-                value: worked.toString(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            height: 120,
-            child: PieChart(
-              PieChartData(
-                sectionsSpace: 2,
-                centerSpaceRadius: 35,
-                sections: [
-                  PieChartSectionData(
-                    value: worked.toDouble(),
-                    color: AppColors.success,
-                    radius: 25,
-                    title: '',
-                  ),
-                  PieChartSectionData(
-                    value: (total - worked).toDouble(),
-                    color: isDark
-                        ? AppColors.surfaceVariantDark
-                        : AppColors.surfaceVariant,
-                    radius: 25,
-                    title: '',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            "${effectiveness.toStringAsFixed(0)}% effective",
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppColors.success),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReminderStat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _ReminderStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, size: 20, color: AppColors.primary),
-        const SizedBox(height: 6),
-        Text(value, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 2),
-        Text(label, style: Theme.of(context).textTheme.labelSmall),
-      ],
-    );
-  }
-}
-
-/// ─────────────────────────────────────────────
-/// TIME CARD
-/// ─────────────────────────────────────────────
-class _TimeCard extends StatelessWidget {
-  final double avgDays;
-  final bool isDark;
-
-  const _TimeCard({required this.avgDays, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-
-    String speed;
-    Color speedColor;
-
-    if (avgDays < 1) {
-      speed = "Lightning fast";
-      speedColor = AppColors.success;
-    } else if (avgDays < 3) {
-      speed = "Quick";
-      speedColor = AppColors.primary;
-    } else if (avgDays < 7) {
-      speed = "Moderate";
-      speedColor = AppColors.warning;
-    } else {
-      speed = "Slow";
-      speedColor = AppColors.error;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border, width: 0.8),
-      ),
+    return AppCard(
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSpacing.sm),
             decoration: BoxDecoration(
-              color: AppColors.primaryMuted,
-              borderRadius: BorderRadius.circular(12),
+              color: color.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
-            child: const Icon(
-              Icons.schedule_rounded,
-              size: 24,
-              color: AppColors.primary,
+            child: Icon(
+              isPositive
+                  ? Icons.trending_up_rounded
+                  : Icons.trending_down_rounded,
+              size: 20,
+              color: color,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('vs last week', style: context.text.labelSmall),
+                const SizedBox(height: 2),
                 Text(
-                  "Avg time to revisit",
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "${avgDays.toStringAsFixed(1)} days",
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: speedColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        speed,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.labelSmall?.copyWith(color: speedColor),
-                      ),
-                    ),
-                  ],
+                  '${isPositive ? '+' : ''}${improvement.toStringAsFixed(1)}%',
+                  style: context.text.titleMedium?.copyWith(color: color),
                 ),
               ],
             ),
@@ -743,53 +490,107 @@ class _TimeCard extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────
-/// INFO CARD
-/// ─────────────────────────────────────────────
-class _InfoCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool isDark;
-  final bool isSecondary;
+/// ───────── Avg time to revisit ─────────
+class _TimeCard extends StatelessWidget {
+  const _TimeCard({required this.avgDays});
 
+  final double avgDays;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+
+    final String speed;
+    final Color speedColor;
+    if (avgDays < 1) {
+      speed = 'Lightning fast';
+      speedColor = c.success;
+    } else if (avgDays < 3) {
+      speed = 'Quick';
+      speedColor = c.primary;
+    } else if (avgDays < 7) {
+      speed = 'Moderate';
+      speedColor = c.warning;
+    } else {
+      speed = 'Slow';
+      speedColor = c.error;
+    }
+
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: c.primarySurface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: const Icon(Icons.schedule_rounded,
+                size: 24, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Avg time to revisit',
+                    style: context.text.labelMedium),
+                const SizedBox(height: AppSpacing.xs + 2),
+                Text('${avgDays.toStringAsFixed(1)} days',
+                    style: context.text.headlineSmall),
+                const SizedBox(height: AppSpacing.xs),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: speedColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppRadius.xs),
+                  ),
+                  child: Text(speed,
+                      style: context.text.labelSmall
+                          ?.copyWith(color: speedColor)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ───────── Generic info row ─────────
+class _InfoCard extends StatelessWidget {
   const _InfoCard({
     required this.icon,
     required this.label,
     required this.value,
-    required this.isDark,
     this.isSecondary = false,
   });
 
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isSecondary;
+
   @override
   Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border, width: 0.8),
-      ),
+    final c = context.c;
+    return AppCard(
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: isSecondary ? AppColors.textTertiary : AppColors.primary,
-          ),
-          const SizedBox(width: 12),
+          Icon(icon, size: 20, color: isSecondary ? c.textTertiary : c.primary),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: Theme.of(context).textTheme.labelSmall),
-                const SizedBox(height: 4),
+                Text(label, style: context.text.labelSmall),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: context.text.titleSmall,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -802,41 +603,25 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────
-/// TOP LINK CARD
-/// ─────────────────────────────────────────────
+/// ───────── Top link (ranked) ─────────
 class _TopLinkCard extends StatelessWidget {
+  const _TopLinkCard({required this.link, required this.rank});
+
   final SavedPost link;
   final int rank;
-  final bool isDark;
-
-  const _TopLinkCard({
-    required this.link,
-    required this.rank,
-    required this.isDark,
-  });
 
   @override
   Widget build(BuildContext context) {
-    final surface = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
+    final c = context.c;
 
-    Color rankColor;
-    if (rank == 1) {
-      rankColor = const Color(0xFFFFD700); // Gold
-    } else if (rank == 2) {
-      rankColor = const Color(0xFFC0C0C0); // Silver
-    } else {
-      rankColor = const Color(0xFFCD7F32); // Bronze
-    }
+    final Color rankColor = switch (rank) {
+      1 => const Color(0xFFE0B341),
+      2 => const Color(0xFFB4B4B4),
+      _ => const Color(0xFFC17F45),
+    };
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border, width: 0.8),
-      ),
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -845,50 +630,39 @@ class _TopLinkCard extends StatelessWidget {
             height: 32,
             decoration: BoxDecoration(
               color: rankColor.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: Center(
-              child: Text(
-                "$rank",
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: rankColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: Text('$rank',
+                  style: context.text.titleSmall?.copyWith(
+                    color: rankColor,
+                    fontWeight: FontWeight.w700,
+                  )),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  link.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+                Text(link.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.titleSmall),
                 const SizedBox(height: 4),
-                Text(
-                  link.domain ?? link.url,
-                  style: Theme.of(context).textTheme.labelSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
+                Text(link.domain ?? link.url,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.text.labelSmall),
+                const SizedBox(height: AppSpacing.sm),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.visibility_rounded,
-                      size: 14,
-                      color: AppColors.primary,
-                    ),
+                    Icon(Icons.visibility_rounded, size: 14, color: c.primary),
                     const SizedBox(width: 4),
                     Text(
-                      "${link.visitCount} visit${link.visitCount != 1 ? 's' : ''}",
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.primary,
-                      ),
+                      '${link.visitCount} visit${link.visitCount != 1 ? 's' : ''}',
+                      style: context.text.labelSmall
+                          ?.copyWith(color: c.primary),
                     ),
                   ],
                 ),
@@ -901,169 +675,44 @@ class _TopLinkCard extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────
-/// SECTION HEADER
-/// ─────────────────────────────────────────────
-class _SectionHeader extends StatelessWidget {
-  final String title;
-
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(title, style: Theme.of(context).textTheme.titleMedium);
-  }
-}
-
-/// ─────────────────────────────────────────────
-/// EMPTY STATE
-/// ─────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.analytics_outlined,
-            size: 52,
-            color: AppColors.textTertiary,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No analytics yet',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Save and revisit links to see insights',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class AnalyticsShimmer extends StatefulWidget {
+/// ───────── Loading skeleton ─────────
+class AnalyticsShimmer extends StatelessWidget {
   const AnalyticsShimmer({super.key});
 
   @override
-  State<AnalyticsShimmer> createState() => _AnalyticsShimmerState();
-}
-
-class _AnalyticsShimmerState extends State<AnalyticsShimmer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-
-    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Widget _box({required Color color, double height = 80, double radius = 14}) {
-    return Container(
-      width: double.infinity,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget box(double height, {double radius = AppRadius.lg}) =>
+        SkeletonBox(height: height, radius: radius);
 
-    final base = isDark
-        ? AppColors.surfaceVariantDark
-        : AppColors.surfaceVariant;
-
-    final highlight = isDark ? AppColors.borderDark : AppColors.border;
-
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, __) {
-        final shimmer = Color.lerp(base, highlight, _anim.value)!;
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              /// HERO
-              _box(color: shimmer, height: 140, radius: 18),
-
-              const SizedBox(height: 20),
-
-              /// BACKLOG + STREAK
-              Row(
-                children: [
-                  Expanded(child: _box(color: shimmer, height: 110)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _box(color: shimmer, height: 110)),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              /// WEEKLY CHART
-              _box(color: shimmer, height: 220),
-
-              const SizedBox(height: 12),
-
-              /// IMPROVEMENT
-              _box(color: shimmer, height: 70),
-
-              const SizedBox(height: 24),
-
-              /// TIME CARD
-              _box(color: shimmer, height: 110),
-
-              const SizedBox(height: 24),
-
-              /// COLLECTIONS
-              _box(color: shimmer, height: 70),
-              const SizedBox(height: 10),
-              _box(color: shimmer, height: 70),
-
-              const SizedBox(height: 24),
-
-              /// SOURCES
-              _box(color: shimmer, height: 70),
-              const SizedBox(height: 10),
-              _box(color: shimmer, height: 70),
-
-              const SizedBox(height: 24),
-
-              /// TOP LINKS
-              _box(color: shimmer, height: 80),
-              const SizedBox(height: 10),
-              _box(color: shimmer, height: 80),
-              const SizedBox(height: 10),
-              _box(color: shimmer, height: 80),
-            ],
-          ),
-        );
-      },
+    return Shimmer(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screen, AppSpacing.md, AppSpacing.screen, 100),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            box(140, radius: AppRadius.xl),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(child: box(110)),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(child: box(110)),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xxl),
+            box(230),
+            const SizedBox(height: AppSpacing.md),
+            box(72),
+            const SizedBox(height: AppSpacing.xxl),
+            box(96),
+            const SizedBox(height: AppSpacing.xxl),
+            box(72),
+            const SizedBox(height: AppSpacing.sm),
+            box(72),
+          ],
+        ),
+      ),
     );
   }
 }
