@@ -455,6 +455,7 @@ class _BillingToggle extends StatelessWidget {
         border: Border.all(color: c.border, width: 0.8),
       ),
       child: Stack(
+        alignment: Alignment.center,
         children: [
           AnimatedAlign(
             duration: AppMotion.fast,
