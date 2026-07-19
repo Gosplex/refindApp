@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../core/utils/auth_stream.dart';
 import '../models/saved_post_model.dart';
 
 class SavedPostsService {
@@ -30,23 +31,18 @@ class SavedPostsService {
   }
 
   Stream<List<SavedPost>> getPostsStream() {
-    return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
-      if (user == null) {
-        return Stream.value([]); // no user → empty
-      }
-
-      return FirebaseFirestore.instance
+    return userSwitchStream<List<SavedPost>>(
+      whenSignedOut: const [],
+      (uid) => _firestore
           .collection('users')
-          .doc(user.uid)
+          .doc(uid)
           .collection('posts')
           .orderBy('createdAt', descending: true)
           .snapshots()
-          .map((snapshot) {
-        return snapshot.docs
-            .map((doc) => SavedPost.fromMap(doc.data()))
-            .toList();
-      });
-    });
+          .map((snapshot) => snapshot.docs
+              .map((doc) => SavedPost.fromMap(doc.data()))
+              .toList()),
+    );
   }
 
   /// ❌ Delete Post
@@ -119,22 +115,19 @@ class SavedPostsService {
   }
 
   Stream<List<SavedPost>> getPostsByCollection(String collectionId) {
-    return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
-      if (user == null) return Stream.value([]);
-
-      return FirebaseFirestore.instance
+    return userSwitchStream<List<SavedPost>>(
+      whenSignedOut: const [],
+      (uid) => _firestore
           .collection('users')
-          .doc(user.uid)
+          .doc(uid)
           .collection('posts')
           .where('collectionId', isEqualTo: collectionId)
           .orderBy('createdAt', descending: true)
           .snapshots()
-          .map((snapshot) {
-        return snapshot.docs
-            .map((doc) => SavedPost.fromMap(doc.data()))
-            .toList();
-      });
-    });
+          .map((snapshot) => snapshot.docs
+              .map((doc) => SavedPost.fromMap(doc.data()))
+              .toList()),
+    );
   }
 
   DocumentReference get _userRef =>

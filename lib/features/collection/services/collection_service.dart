@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/model/app_user_model.dart';
+import '../../../core/utils/auth_stream.dart';
 import '../models/collection_model.dart';
 
 class CollectionsService {
@@ -27,24 +28,18 @@ class CollectionsService {
   /// 📥 Get Collections (Realtime)
   /// ─────────────────────────────────────────────
   Stream<List<CollectionModel>> getCollectionsStream() {
-    return FirebaseAuth.instance.authStateChanges().asyncExpand((user) {
-      if (user == null) return Stream.value([]);
-
-      return FirebaseFirestore.instance
+    return userSwitchStream<List<CollectionModel>>(
+      whenSignedOut: const [],
+      (uid) => _firestore
           .collection('users')
-          .doc(user.uid)
+          .doc(uid)
           .collection('collections')
           .orderBy('createdAt')
           .snapshots()
-          .map((snapshot) {
-        return snapshot.docs.map((doc) {
-          return CollectionModel.fromMap(
-            doc.data() as Map<String, dynamic>,
-            doc.id,
-          );
-        }).toList();
-      });
-    });
+          .map((snapshot) => snapshot.docs
+              .map((doc) => CollectionModel.fromMap(doc.data(), doc.id))
+              .toList()),
+    );
   }
 
   /// ─────────────────────────────────────────────

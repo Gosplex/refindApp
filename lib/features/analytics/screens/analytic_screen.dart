@@ -17,7 +17,6 @@ class AnalyticsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = AnalyticsController();
-    final isPro = InAppPurchaseService().isPro;
 
     return Scaffold(
       appBar: AppBar(
@@ -76,9 +75,12 @@ class AnalyticsScreen extends StatelessWidget {
                 const SizedBox(height: AppSpacing.xxl),
                 FadeSlideIn(
                   index: 2,
-                  child: AnalyticsLockWrapper(
-                    isPro: isPro,
-                    child: Column(
+                  child: StreamBuilder<bool>(
+                    stream: InAppPurchaseService().proStatusStream,
+                    initialData: InAppPurchaseService().isPro,
+                    builder: (context, proSnap) => AnalyticsLockWrapper(
+                      isPro: proSnap.data ?? false,
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SectionHeader(
@@ -164,6 +166,7 @@ class AnalyticsScreen extends StatelessWidget {
                         ],
                       ],
                     ),
+                  ),
                   ),
                 ),
               ],

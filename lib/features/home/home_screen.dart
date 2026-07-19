@@ -29,6 +29,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final SavedPostsController controller = SavedPostsController();
 
+  // Created once so search keystroke rebuilds don't re-subscribe / flash.
+  late final Stream<List<SavedPost>> _postsStream = controller.getPostsStream();
+
   String _searchQuery = '';
 
   void _showAddPostSheet({String? initialText}) {
@@ -157,7 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Pinned collections + saved posts share one scroll view
             Expanded(
               child: StreamBuilder<List<SavedPost>>(
-                stream: controller.getPostsStream(),
+                stream: _postsStream,
                 builder: (context, snapshot) {
                   final waiting =
                       snapshot.connectionState == ConnectionState.waiting;
