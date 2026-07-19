@@ -15,9 +15,14 @@ class AuthController {
   /// Full one-time setup for whichever user is now signed in: creates/updates
   /// the user doc, seeds default collections, configures RevenueCat, and links
   /// the RC identity for non-anonymous users.
-  Future<void> _setupForUser(User user) async {
+  Future<void> _setupForUser(User user, {void Function(String)? onStatus}) async {
+    onStatus?.call('Creating your profile…');
     await _createOrUpdateUser(user);
+
+    onStatus?.call('Setting up your collections…');
     await CollectionsController().seedDefaults();
+
+    onStatus?.call('Checking your subscription…');
     await InAppPurchaseService().configureRevenueCat(user.uid);
     await InAppPurchaseService().fetchCustomerInfo();
 
@@ -30,6 +35,8 @@ class AuthController {
         debugPrint("RevenueCat logIn error: $e");
       }
     }
+
+    onStatus?.call('Finishing up…');
   }
 
   /// Splash entry point. If a session is already persisted, set it up and
@@ -47,11 +54,12 @@ class AuthController {
   }
 
   /// Welcome gate — "Continue without an account".
-  Future<bool> continueAsGuest() async {
+  Future<bool> continueAsGuest({void Function(String)? onStatus}) async {
     try {
+      onStatus?.call('Getting things ready…');
       final user = await _authService.signInAnonymously();
       if (user == null) return false;
-      await _setupForUser(user);
+      await _setupForUser(user, onStatus: onStatus);
       return true;
     } catch (e) {
       debugPrint("continueAsGuest error: $e");
@@ -61,12 +69,15 @@ class AuthController {
 
   /// Welcome gate — "Continue with Google". Returns the user on success, or
   /// null if the user cancelled / it failed.
-  Future<User?> signInWithGoogleForOnboarding() async {
+  Future<User?> signInWithGoogleForOnboarding(
+      {void Function(String)? onStatus}) async {
+    onStatus?.call('Opening Google…');
     final credential = await _authService.signInWithGoogle();
     if (credential == null || _authService.currentUser == null) return null;
 
+    onStatus?.call('Signing you in…');
     await _authService.ensureDisplayName();
-    await _setupForUser(_authService.currentUser!);
+    await _setupForUser(_authService.currentUser!, onStatus: onStatus);
     return _authService.currentUser;
   }
 
@@ -75,6 +86,19 @@ class AuthController {
   Future<bool> ensureSignedIn() async {
     if (_authService.currentUser != null) return true;
     return continueAsGuest();
+  }
+
+  /// Signs the user out of Google + Firebase and resets the RevenueCat
+  /// identity so the next account doesn't inherit entitlements. The caller is
+  /// responsible for routing back to the welcome gate.
+  Future<void> signOut() async {
+    try {
+      await Purchases.logOut();
+    } catch (e) {
+      // Throws if already anonymous — safe to ignore.
+      debugPrint("RevenueCat logOut skipped: $e");
+    }
+    await _authService.signOut();
   }
 
   // Call this when user upgrades from anonymous → Google

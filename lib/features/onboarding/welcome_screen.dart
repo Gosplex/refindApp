@@ -25,10 +25,18 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   final _auth = AuthController();
   _Action? _busy;
+  String _status = '';
+
+  void _setStatus(String s) {
+    if (mounted) setState(() => _status = s);
+  }
 
   Future<void> _google() async {
-    setState(() => _busy = _Action.google);
-    final user = await _auth.signInWithGoogleForOnboarding();
+    setState(() {
+      _busy = _Action.google;
+      _status = 'Opening Google…';
+    });
+    final user = await _auth.signInWithGoogleForOnboarding(onStatus: _setStatus);
     if (!mounted) return;
     if (user == null) {
       setState(() => _busy = null); // cancelled / failed
@@ -38,8 +46,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _guest() async {
-    setState(() => _busy = _Action.guest);
-    final ok = await _auth.continueAsGuest();
+    setState(() {
+      _busy = _Action.guest;
+      _status = 'Getting things ready…';
+    });
+    final ok = await _auth.continueAsGuest(onStatus: _setStatus);
     if (!mounted) return;
     if (!ok) {
       setState(() => _busy = null);
@@ -52,6 +63,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   }
 
   Future<void> _goHome() async {
+    _setStatus('Almost done…');
     final settings = SettingsController();
     await settings.loadSettings();
     themeController.setTheme(settings.settings?.theme ?? 'System');
@@ -84,34 +96,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               FadeSlideIn(
                 child: Column(
                   children: [
-                    Container(
-                      width: 76,
-                      height: 76,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.primary, Color(0xFF5A8C69)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.35),
-                            blurRadius: 24,
-                            spreadRadius: -6,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.bookmark_rounded,
-                          size: 38, color: Colors.white),
-                    ),
+                    const _BrandBadge(),
                     const SizedBox(height: AppSpacing.xl),
-                    Text(
-                      'Refind',
-                      style: context.text.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
+                    Text('Refind',
+                        style: context.text.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
                       'Save links, and actually come back to them.',
@@ -171,12 +160,38 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       loading: _busy == _Action.guest,
                       onPressed: busy ? null : _guest,
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'Sign in to sync and restore your links across devices.',
-                      textAlign: TextAlign.center,
-                      style: context.text.labelSmall?.copyWith(
-                        color: c.textTertiary,
+                    const SizedBox(height: AppSpacing.md),
+                    // Live status while busy; helper caption otherwise.
+                    SizedBox(
+                      height: 18,
+                      child: AnimatedSwitcher(
+                        duration: AppMotion.fast,
+                        child: busy
+                            ? Row(
+                                key: ValueKey(_status),
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.sync_rounded,
+                                      size: 13, color: c.primary),
+                                  const SizedBox(width: AppSpacing.xs + 2),
+                                  Flexible(
+                                    child: Text(
+                                      _status,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: context.text.labelMedium
+                                          ?.copyWith(color: c.primary),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                'Sign in to sync and restore your links across devices.',
+                                key: const ValueKey('caption'),
+                                textAlign: TextAlign.center,
+                                style: context.text.labelSmall
+                                    ?.copyWith(color: c.textTertiary),
+                              ),
                       ),
                     ),
                   ],
@@ -188,6 +203,35 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _BrandBadge extends StatelessWidget {
+  const _BrandBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 76,
+      height: 76,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, Color(0xFF5A8C69)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.35),
+            blurRadius: 24,
+            spreadRadius: -6,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.bookmark_rounded, size: 38, color: Colors.white),
     );
   }
 }

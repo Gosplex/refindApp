@@ -13,6 +13,7 @@ import '../../main.dart';
 import '../../services/in_app_purchase_service.dart';
 import '../auth/auth_controller.dart';
 import '../auth/auth_service.dart';
+import '../onboarding/welcome_screen.dart';
 import '../saved_posts/saved_posts_controller.dart';
 import 'settings_controller.dart';
 import 'models/user_settings_model.dart';
@@ -166,6 +167,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _signOut() async {
+    final confirm = await showConfirmDialog(
+      context,
+      icon: Icons.logout_rounded,
+      title: 'Sign out?',
+      message: 'You can sign back in anytime to restore your links.',
+      confirmLabel: 'Sign out',
+    );
+    if (!confirm) return;
+
+    await AuthController().signOut();
+    if (!mounted) return;
+
+    // Back to the welcome gate, clearing the whole stack.
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      (route) => false,
+    );
+  }
+
   Future<void> _showClearDialog() async {
     final confirm = await showConfirmDialog(
       context,
@@ -221,6 +242,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   email: auth.email,
                   onSignIn: _signInWithGoogle,
                   onUpgrade: _openPaywall,
+                  onSignOut: _signOut,
                 ),
               ),
               const SizedBox(height: AppSpacing.xxl),
@@ -393,6 +415,7 @@ class _AccountCard extends StatelessWidget {
     required this.isAnonymous,
     required this.onSignIn,
     required this.onUpgrade,
+    required this.onSignOut,
     this.name,
     this.email,
   });
@@ -401,6 +424,7 @@ class _AccountCard extends StatelessWidget {
   final bool isAnonymous;
   final VoidCallback onSignIn;
   final VoidCallback onUpgrade;
+  final VoidCallback onSignOut;
   final String? name;
   final String? email;
 
@@ -443,7 +467,44 @@ class _AccountCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             _UpgradeBanner(onTap: onUpgrade),
           ],
+          if (!isAnonymous) ...[
+            const SizedBox(height: AppSpacing.md),
+            _SignOutRow(onTap: onSignOut),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _SignOutRow extends StatelessWidget {
+  const _SignOutRow({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return PressableScale(
+      onTap: onTap,
+      pressedScale: 0.98,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: c.surfaceVariant,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.logout_rounded, size: 18, color: c.textSecondary),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text('Sign out', style: context.text.titleSmall),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 18, color: c.textTertiary),
+          ],
+        ),
       ),
     );
   }
