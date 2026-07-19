@@ -74,8 +74,7 @@ class _FloatingNavBar extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.fromLTRB(
             AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.md),
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
         decoration: BoxDecoration(
           color: c.surface,
           borderRadius: BorderRadius.circular(AppRadius.xxl),
@@ -89,15 +88,19 @@ class _FloatingNavBar extends StatelessWidget {
             ),
           ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(items.length, (i) {
-            return _NavTile(
-              item: items[i],
-              selected: i == currentIndex,
-              onTap: () => onTap(i),
-            );
-          }),
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(items.length, (i) {
+              return _NavTile(
+                item: items[i],
+                selected: i == currentIndex,
+                onTap: () => onTap(i),
+              );
+            }),
+          ),
         ),
       ),
     );

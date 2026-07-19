@@ -154,44 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Pinned collections
-            StreamBuilder<List<CollectionModel>>(
-              stream: CollectionsController().getCollectionsStream(),
-              builder: (context, snapshot) {
-                final collections = snapshot.data ?? [];
-                final pinned = collections.where((c) => c.isPinned).toList();
-                if (pinned.isEmpty) return const SizedBox.shrink();
-
-                return FadeSlideIn(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: AppSpacing.md),
-                      const SectionHeader(title: 'Pinned collections'),
-                      const SizedBox(height: AppSpacing.md),
-                      SizedBox(
-                        height: 96,
-                        child: ListView.separated(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.screen),
-                          scrollDirection: Axis.horizontal,
-                          itemCount: pinned.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(width: AppSpacing.md),
-                          itemBuilder: (context, index) => FadeSlideIn(
-                            index: index,
-                            offset: 24,
-                            child: PinnedCard(collection: pinned[index]),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-
-            // Saved posts
+            // Pinned collections + saved posts share one scroll view
             Expanded(
               child: StreamBuilder<List<SavedPost>>(
                 stream: controller.getPostsStream(),
@@ -199,61 +162,66 @@ class _HomeScreenState extends State<HomeScreen> {
                   final waiting =
                       snapshot.connectionState == ConnectionState.waiting;
 
-                  final Widget child;
+                  late final Widget postsSliver;
                   if (waiting) {
-                    child = const _PostSkeletonList(key: ValueKey('loading'));
+                    postsSliver = const _PostSkeletonSliver();
                   } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    child = _EmptyHome(
-                      key: const ValueKey('empty'),
-                      onAdd: _showAddPostSheet,
+                    postsSliver = SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyHome(onAdd: _showAddPostSheet),
                     );
                   } else {
                     final filtered =
                         filterPosts(snapshot.data!, _searchQuery);
 
                     if (filtered.isEmpty) {
-                      child = const _NoResults(key: ValueKey('no-results'));
+                      postsSliver = const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _NoResults(),
+                      );
                     } else {
-                      child = ListView.builder(
-                        key: const ValueKey('list'),
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
+                      postsSliver = SliverPadding(
                         padding: const EdgeInsets.fromLTRB(AppSpacing.screen,
-                            AppSpacing.md, AppSpacing.screen, 110),
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final post = filtered[index];
-                          return FadeSlideIn(
-                            index: index,
-                            child: PostCard(
-                              post: post,
-                              onDelete: () async {
-                                if (await _confirmDelete()) {
-                                  controller.deletePost(post.id);
-                                }
-                              },
-                              onDismiss: () =>
-                                  controller.dismissPost(post.id),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        LinkDetailScreen(post: post),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        },
+                            AppSpacing.md, AppSpacing.screen, 120),
+                        sliver: SliverList.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            final post = filtered[index];
+                            return FadeSlideIn(
+                              index: index,
+                              child: PostCard(
+                                post: post,
+                                onDelete: () async {
+                                  if (await _confirmDelete()) {
+                                    controller.deletePost(post.id);
+                                  }
+                                },
+                                onDismiss: () =>
+                                    controller.dismissPost(post.id),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          LinkDetailScreen(post: post),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
                       );
                     }
                   }
 
-                  return AnimatedSwitcher(
-                    duration: AppMotion.medium,
-                    switchInCurve: AppMotion.standard,
-                    child: child,
+                  return CustomScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    slivers: [
+                      const SliverToBoxAdapter(child: _PinnedSection()),
+                      postsSliver,
+                    ],
                   );
                 },
               ),
@@ -390,7 +358,7 @@ class _UsagePill extends StatelessWidget {
 /// Empty / no-result states
 /// ─────────────────────────────────────────────
 class _EmptyHome extends StatelessWidget {
-  const _EmptyHome({super.key, required this.onAdd});
+  const _EmptyHome({required this.onAdd});
 
   final VoidCallback onAdd;
 
@@ -407,7 +375,7 @@ class _EmptyHome extends StatelessWidget {
 }
 
 class _NoResults extends StatelessWidget {
-  const _NoResults({super.key});
+  const _NoResults();
 
   @override
   Widget build(BuildContext context) {
@@ -420,40 +388,131 @@ class _NoResults extends StatelessWidget {
 }
 
 /// ─────────────────────────────────────────────
-/// Loading skeleton
+/// Pinned collections section (scrolls with the list, has its own shimmer)
 /// ─────────────────────────────────────────────
-class _PostSkeletonList extends StatelessWidget {
-  const _PostSkeletonList({super.key});
+class _PinnedSection extends StatelessWidget {
+  const _PinnedSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<CollectionModel>>(
+      stream: CollectionsController().getCollectionsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _PinnedShimmerRow();
+        }
+
+        final collections = snapshot.data ?? [];
+        final pinned = collections.where((c) => c.isPinned).toList();
+        if (pinned.isEmpty) return const SizedBox.shrink();
+
+        return FadeSlideIn(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: AppSpacing.md),
+              const SectionHeader(title: 'Pinned collections'),
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(
+                height: 96,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.screen),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: pinned.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: AppSpacing.md),
+                  itemBuilder: (context, index) => FadeSlideIn(
+                    index: index,
+                    offset: 24,
+                    child: PinnedCard(collection: pinned[index]),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PinnedShimmerRow extends StatelessWidget {
+  const _PinnedShimmerRow();
 
   @override
   Widget build(BuildContext context) {
     return Shimmer(
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.md,
-            AppSpacing.screen, AppSpacing.lg),
-        itemCount: 6,
-        itemBuilder: (_, __) => Padding(
-          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-          child: AppCard(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                SkeletonBox(width: 66, height: 66, radius: AppRadius.md),
-                SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSpacing.md),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.screen),
+            child: SkeletonBox(width: 150, height: 16),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppSpacing.screen),
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 3,
+              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
+              itemBuilder: (_, __) =>
+                  const SkeletonBox(width: 156, height: 96, radius: AppRadius.lg),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────
+/// Loading skeleton for the post list (as a sliver)
+/// ─────────────────────────────────────────────
+class _PostSkeletonSliver extends StatelessWidget {
+  const _PostSkeletonSliver();
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Shimmer(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.md,
+              AppSpacing.screen, AppSpacing.lg),
+          child: Column(
+            children: List.generate(
+              6,
+              (_) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: AppCard(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SkeletonBox(height: 14),
-                      SizedBox(height: AppSpacing.sm),
-                      SkeletonBox(width: 140, height: 11),
-                      SizedBox(height: AppSpacing.md),
-                      SkeletonBox(width: 90, height: 20, radius: AppRadius.xs),
+                    children: const [
+                      SkeletonBox(width: 66, height: 66, radius: AppRadius.md),
+                      SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SkeletonBox(height: 14),
+                            SizedBox(height: AppSpacing.sm),
+                            SkeletonBox(width: 140, height: 11),
+                            SizedBox(height: AppSpacing.md),
+                            SkeletonBox(
+                                width: 90, height: 20, radius: AppRadius.xs),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ),
