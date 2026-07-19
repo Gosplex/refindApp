@@ -463,11 +463,19 @@ class _BillingToggle extends StatelessWidget {
                 isYearly ? Alignment.centerRight : Alignment.centerLeft,
             child: FractionallySizedBox(
               widthFactor: 0.5,
+              heightFactor: 1,
               child: Container(
                 decoration: BoxDecoration(
                   color: c.surface,
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                   border: Border.all(color: c.border, width: 0.8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: c.shadow,
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
               ),
             ),
