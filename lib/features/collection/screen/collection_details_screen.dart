@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/colors.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/theme/theme_x.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../home/link_details_screen.dart';
 import '../../home/widgets/post_card.dart';
 import '../../saved_posts/models/saved_post_model.dart';
@@ -15,50 +17,49 @@ class CollectionDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = SavedPostsController();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          collection.name,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
+        title: Text(collection.name, style: context.text.titleLarge),
       ),
-
       body: StreamBuilder<List<SavedPost>>(
         stream: controller.getPostsByCollection(collection.id),
         builder: (context, snapshot) {
-
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const _ShimmerList();
+            return const _DetailSkeleton();
           }
 
           final posts = snapshot.data ?? [];
 
           if (posts.isEmpty) {
-            return _EmptyState(collection: collection);
+            return _EmptyDetail(collection: collection);
           }
 
           return ListView.builder(
-            keyboardDismissBehavior:
-            ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-            itemCount: posts.length,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screen, AppSpacing.md, AppSpacing.screen, 100),
+            itemCount: posts.length + 1,
             itemBuilder: (context, index) {
-              final post = posts[index];
-
-              return PostCard(
-                post: post,
-                onDelete: () => controller.deletePost(post.id),
-                onDismiss: () => controller.dismissPost(post.id),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => LinkDetailScreen(post: post),
-                    ),
-                  );
-                },
+              if (index == 0) {
+                return FadeSlideIn(child: _Header(collection: collection, count: posts.length));
+              }
+              final post = posts[index - 1];
+              return FadeSlideIn(
+                index: index,
+                child: PostCard(
+                  post: post,
+                  onDelete: () => controller.deletePost(post.id),
+                  onDismiss: () => controller.dismissPost(post.id),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LinkDetailScreen(post: post),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           );
@@ -68,164 +69,96 @@ class CollectionDetailScreen extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────────
-/// 🫙 Empty State
-/// ─────────────────────────────────────────────
-class _EmptyState extends StatelessWidget {
-  final CollectionModel collection;
+class _Header extends StatelessWidget {
+  const _Header({required this.collection, required this.count});
 
-  const _EmptyState({required this.collection});
+  final CollectionModel collection;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    final c = context.c;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
         children: [
-          Icon(
-            Icons.folder_open_rounded,
-            size: 52,
-            color: AppColors.textTertiary,
+          Row(
+            children: [
+              Icon(Icons.link_rounded, size: 15, color: c.textSecondary),
+              const SizedBox(width: AppSpacing.xs + 2),
+              Text(
+                '$count ${count == 1 ? 'link' : 'links'}',
+                style: context.text.labelMedium,
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'No links yet',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Save links into "${collection.name}"',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          if (collection.description.isNotEmpty) ...[
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(
+                collection.description,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: context.text.bodySmall,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// ─────────────────────────────────────────────
-/// ✨ Shimmer List (same philosophy as Home)
-/// ─────────────────────────────────────────────
-class _ShimmerList extends StatefulWidget {
-  const _ShimmerList();
+class _EmptyDetail extends StatelessWidget {
+  const _EmptyDetail({required this.collection});
 
-  @override
-  State<_ShimmerList> createState() => _ShimmerListState();
-}
-
-class _ShimmerListState extends State<_ShimmerList>
-    with SingleTickerProviderStateMixin {
-
-  late final AnimationController _controller;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-
-    _anim = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  final CollectionModel collection;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, _) {
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          itemCount: 5,
-          itemBuilder: (_, __) => _ShimmerCard(
-            progress: _anim.value,
-            isDark: isDark,
-          ),
-        );
-      },
+    return EmptyState(
+      icon: Icons.folder_open_rounded,
+      title: 'No links yet',
+      message: 'Links you add to "${collection.name}" will show up here.',
     );
   }
 }
 
-class _ShimmerCard extends StatelessWidget {
-  const _ShimmerCard({
-    required this.progress,
-    required this.isDark,
-  });
-
-  final double progress;
-  final bool isDark;
-
-  Color get _base =>
-      isDark ? AppColors.surfaceDark : AppColors.surfaceVariant;
-
-  Color get _highlight =>
-      isDark ? AppColors.surfaceVariantDark : AppColors.surface;
-
-  Color get _shimmer =>
-      Color.lerp(_base, _highlight, progress)!;
-
-  Widget _block(double w, double h, {double radius = 6}) {
-    return Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(
-        color: _shimmer,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
+class _DetailSkeleton extends StatelessWidget {
+  const _DetailSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final borderColor =
-    isDark ? AppColors.borderDark : AppColors.border;
-
-    final surfaceColor =
-    isDark ? AppColors.surfaceDark : AppColors.surface;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 0.8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-
-          _block(62, 62, radius: 10),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
+    return Shimmer(
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screen, AppSpacing.md, AppSpacing.screen, AppSpacing.lg),
+        itemCount: 6,
+        itemBuilder: (_, __) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: AppCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _block(double.infinity, 14),
-                const SizedBox(height: 8),
-                _block(140, 11),
-                const SizedBox(height: 12),
-                _block(90, 20, radius: 6),
+              children: const [
+                SkeletonBox(width: 66, height: 66, radius: AppRadius.md),
+                SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(height: 14),
+                      SizedBox(height: AppSpacing.sm),
+                      SkeletonBox(width: 140, height: 11),
+                      SizedBox(height: AppSpacing.md),
+                      SkeletonBox(width: 90, height: 20, radius: AppRadius.xs),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
