@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:metadata_fetch/metadata_fetch.dart';
 import 'package:provider/provider.dart';
 import 'package:refind_app/features/home/widgets/pinned_card.dart';
-import 'package:refind_app/features/home/widgets/pinned_shimmer.dart';
 import 'package:refind_app/features/subscription/subscription_screen.dart';
 
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/colors.dart';
+import '../../core/theme/theme_x.dart';
+import '../../core/widgets/widgets.dart';
 import '../../services/in_app_purchase_service.dart';
 import '../collection/collection_controller.dart';
 import '../collection/models/collection_model.dart';
@@ -30,198 +31,80 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _searchQuery = '';
 
-  _showAddPostSheet({String? initialText}) {
-    HapticFeedback.lightImpact();
-
-    showModalBottomSheet(
+  void _showAddPostSheet({String? initialText}) {
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      backgroundColor: Colors.transparent,
+      title: 'Save a link',
       builder: (_) =>
           _AddPostSheet(controller: controller, initialText: initialText),
     ).then((_) {
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     });
   }
 
-  Future<bool> _confirmDelete() async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete post?'),
-          content: const Text(
-            'This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-              ),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
+  Future<bool> _confirmDelete() {
+    return showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: 'Delete this link?',
+      message: 'This action can’t be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
     );
-
-    return result ?? false;
   }
 
   void _showUsageInfo() {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Usage limit",
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-
-              const SizedBox(height: 12),
-
-              Text(
-                "This counter tracks the total number of links you've saved over time.",
-              ),
-
-              const SizedBox(height: 8),
-
-              Text(
-                "Even if you delete posts, your usage remains the same.",
-                style: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // 👇 subtle upsell
-              Text(
-                "Upgrade to unlock unlimited saves.",
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-
-              const SizedBox(height: 16),
-
-              StreamBuilder<bool>(
-                stream: InAppPurchaseService().proStatusStream,
-                initialData: InAppPurchaseService().isPro,
-                builder: (context, snapshot) {
-                  final isPro = snapshot.data ?? false;
-
-                  if (isPro) return const SizedBox.shrink();
-
-                  return SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => SubscriptionScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text("Upgrade"),
+      title: 'Usage limit',
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "This counter tracks the total number of links you've saved over time.",
+            style: context.text.bodyMedium,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            "Even if you delete posts, your usage count stays the same.",
+            style: context.text.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          StreamBuilder<bool>(
+            stream: InAppPurchaseService().proStatusStream,
+            initialData: InAppPurchaseService().isPro,
+            builder: (context, snapshot) {
+              final isPro = snapshot.data ?? false;
+              if (isPro) return const SizedBox.shrink();
+              return AppButton(
+                label: 'Upgrade for unlimited saves',
+                icon: Icons.auto_awesome_rounded,
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SubscriptionScreen(),
                     ),
                   );
                 },
-              ),
-            ],
+              );
+            },
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildUsageIndicator() {
-    return Consumer<UsageProvider>(
-      builder: (context, usage, _) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final isNearLimit = usage.total >= (usage.limit * 0.8).floor();
-        final isAtLimit = usage.total >= usage.limit;
-
-        final pillBg = isAtLimit
-            ? AppColors.errorMuted
-            : isNearLimit
-            ? AppColors.warningMuted
-            : isDark
-            ? AppColors.surfaceVariantDark
-            : AppColors.primaryMuted;
-
-        final textColor = isAtLimit
-            ? AppColors.error
-            : isNearLimit
-            ? AppColors.warning
-            : AppColors.primary;
-
-        return GestureDetector(
-          onTap: _showUsageInfo,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: pillBg,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${usage.total}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                    height: 1,
-                  ),
-                ),
-                Text(
-                  '/${usage.limit}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                    color: textColor.withValues(alpha: 0.6),
-                    height: 1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 
   List<SavedPost> filterPosts(List<SavedPost> posts, String query) {
     if (query.trim().isEmpty) return posts;
-
     final q = query.toLowerCase();
-
     return posts.where((post) {
       final title = post.title.toLowerCase();
       final description = post.description?.toLowerCase() ?? '';
       final url = post.url.toLowerCase();
       final domain = post.domain?.toLowerCase() ?? '';
       final tags = post.tags?.join(' ').toLowerCase() ?? '';
-
       return title.contains(q) ||
           description.contains(q) ||
           url.contains(q) ||
@@ -234,130 +117,143 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Refind', style: Theme.of(context).textTheme.titleLarge),
+        titleSpacing: AppSpacing.screen,
+        title: Row(
+          children: [
+            const Icon(Icons.bookmark_rounded,
+                color: AppColors.primary, size: 22),
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              'Refind',
+              style: context.text.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: _buildUsageIndicator(),
+            padding: const EdgeInsets.only(right: AppSpacing.screen),
+            child: _UsagePill(onInfo: _showUsageInfo),
           ),
         ],
       ),
 
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.onPrimary,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        onPressed: _showAddPostSheet,
-        child: const Icon(Icons.add_rounded, size: 26),
-      ),
+      floatingActionButton: _AddFab(onTap: _showAddPostSheet),
 
       body: GestureDetector(
-        onTap: () {
-          FocusScope.of(context).unfocus();
-        },
+        onTap: () => FocusScope.of(context).unfocus(),
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: TextField(
-                onChanged: (value) {
-                  setState(() => _searchQuery = value);
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search saved links...',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 18),
-                ),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.screen,
+                  AppSpacing.sm, AppSpacing.screen, AppSpacing.xs),
+              child: SearchField(
+                hint: 'Search saved links…',
+                onChanged: (v) => setState(() => _searchQuery = v),
               ),
             ),
+
+            // Pinned collections
             StreamBuilder<List<CollectionModel>>(
               stream: CollectionsController().getCollectionsStream(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const PinnedShimmer();
-                }
-
                 final collections = snapshot.data ?? [];
-
                 final pinned = collections.where((c) => c.isPinned).toList();
-
                 if (pinned.isEmpty) return const SizedBox.shrink();
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 12),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Pinned Collections',
-                        style: Theme.of(context).textTheme.titleSmall,
+                return FadeSlideIn(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: AppSpacing.md),
+                      const SectionHeader(title: 'Pinned collections'),
+                      const SizedBox(height: AppSpacing.md),
+                      SizedBox(
+                        height: 96,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.screen),
+                          scrollDirection: Axis.horizontal,
+                          itemCount: pinned.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: AppSpacing.md),
+                          itemBuilder: (context, index) => FadeSlideIn(
+                            index: index,
+                            offset: 24,
+                            child: PinnedCard(collection: pinned[index]),
+                          ),
+                        ),
                       ),
-                    ),
-
-                    const SizedBox(height: 10),
-
-                    SizedBox(
-                      height: 90,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        scrollDirection: Axis.horizontal,
-                        itemCount: pinned.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 10),
-                        itemBuilder: (context, index) {
-                          final col = pinned[index];
-
-                          return PinnedCard(collection: col);
-                        },
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
             ),
+
+            // Saved posts
             Expanded(
               child: StreamBuilder<List<SavedPost>>(
                 stream: controller.getPostsStream(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const _ShimmerList();
-                  }
+                  final waiting =
+                      snapshot.connectionState == ConnectionState.waiting;
 
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const _EmptyState();
-                  }
+                  final Widget child;
+                  if (waiting) {
+                    child = const _PostSkeletonList(key: ValueKey('loading'));
+                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    child = _EmptyHome(
+                      key: const ValueKey('empty'),
+                      onAdd: _showAddPostSheet,
+                    );
+                  } else {
+                    final filtered =
+                        filterPosts(snapshot.data!, _searchQuery);
 
-                  final posts = snapshot.data!;
-
-                  final filteredPosts = filterPosts(posts, _searchQuery);
-
-                  return ListView.builder(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                    itemCount: filteredPosts.length,
-                    itemBuilder: (context, index) {
-                      final post = filteredPosts[index];
-                      return PostCard(
-                        post: post,
-                        onDelete: () async {
-                          final confirm = await _confirmDelete();
-                          if (confirm) {
-                            controller.deletePost(post.id);
-                          }
-                        },
-                        onDismiss: () => controller.dismissPost(post.id),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => LinkDetailScreen(post: post),
+                    if (filtered.isEmpty) {
+                      child = const _NoResults(key: ValueKey('no-results'));
+                    } else {
+                      child = ListView.builder(
+                        key: const ValueKey('list'),
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.screen,
+                            AppSpacing.md, AppSpacing.screen, 110),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final post = filtered[index];
+                          return FadeSlideIn(
+                            index: index,
+                            child: PostCard(
+                              post: post,
+                              onDelete: () async {
+                                if (await _confirmDelete()) {
+                                  controller.deletePost(post.id);
+                                }
+                              },
+                              onDismiss: () =>
+                                  controller.dismissPost(post.id),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        LinkDetailScreen(post: post),
+                                  ),
+                                );
+                              },
                             ),
                           );
                         },
                       );
-                    },
+                    }
+                  }
+
+                  return AnimatedSwitcher(
+                    duration: AppMotion.medium,
+                    switchInCurve: AppMotion.standard,
+                    child: child,
                   );
                 },
               ),
@@ -369,142 +265,206 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+/// ─────────────────────────────────────────────
+/// Animated "Save" FAB
+/// ─────────────────────────────────────────────
+class _AddFab extends StatelessWidget {
+  const _AddFab({required this.onTap});
+
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.bookmark_border_rounded,
-            size: 52,
-            color: AppColors.textTertiary,
+    return PressableScale(
+      onTap: onTap,
+      pressedScale: 0.93,
+      child: Container(
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.primary, Color(0xFF5A8C69)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(height: 16),
-          Text(
-            'No saved posts yet',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Save links and revisit them later',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary.withValues(alpha: 0.35),
+              blurRadius: 18,
+              spreadRadius: -2,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add_rounded, color: Colors.white, size: 24),
+            const SizedBox(width: AppSpacing.sm),
+            Text(
+              'Save',
+              style: context.text.labelLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _ShimmerList extends StatefulWidget {
-  const _ShimmerList();
+/// ─────────────────────────────────────────────
+/// Usage pill (tap for details / upsell)
+/// ─────────────────────────────────────────────
+class _UsagePill extends StatelessWidget {
+  const _UsagePill({required this.onInfo});
 
-  @override
-  State<_ShimmerList> createState() => _ShimmerListState();
-}
-
-class _ShimmerListState extends State<_ShimmerList>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+  final VoidCallback onInfo;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Consumer<UsageProvider>(
+      builder: (context, usage, _) {
+        final c = context.c;
+        final isNearLimit = usage.total >= (usage.limit * 0.8).floor();
+        final isAtLimit = usage.total >= usage.limit;
 
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, _) {
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          itemCount: 5,
-          itemBuilder: (_, __) =>
-              _ShimmerCard(progress: _anim.value, isDark: isDark),
+        final bg = isAtLimit
+            ? c.errorSurface
+            : isNearLimit
+                ? c.warningSurface
+                : c.primarySurface;
+        final fg = isAtLimit
+            ? c.error
+            : isNearLimit
+                ? c.warning
+                : c.primary;
+
+        return PressableScale(
+          onTap: onInfo,
+          pressedScale: 0.9,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: 6),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.bolt_rounded, size: 14, color: fg),
+                const SizedBox(width: 3),
+                Text(
+                  '${usage.total}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                    height: 1,
+                  ),
+                ),
+                Text(
+                  '/${usage.limit >= 999999 ? '∞' : usage.limit}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: fg.withValues(alpha: 0.6),
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
 }
 
-class _ShimmerCard extends StatelessWidget {
-  const _ShimmerCard({required this.progress, required this.isDark});
+/// ─────────────────────────────────────────────
+/// Empty / no-result states
+/// ─────────────────────────────────────────────
+class _EmptyHome extends StatelessWidget {
+  const _EmptyHome({super.key, required this.onAdd});
 
-  final double progress;
-  final bool isDark;
-
-  Color get _base => isDark ? AppColors.surfaceDark : AppColors.surfaceVariant;
-
-  Color get _highlight =>
-      isDark ? AppColors.surfaceVariantDark : AppColors.surface;
-
-  Color get _shimmer => Color.lerp(_base, _highlight, progress)!;
-
-  Widget _block(double w, double h, {double radius = 6}) {
-    return Container(
-      width: w,
-      height: h,
-      decoration: BoxDecoration(
-        color: _shimmer,
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
+  final VoidCallback onAdd;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
-    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
+    return EmptyState(
+      icon: Icons.bookmark_add_rounded,
+      title: 'Nothing saved yet',
+      message: 'Save a link and Refind will remind you to come back to it.',
+      actionLabel: 'Save your first link',
+      onAction: onAdd,
+    );
+  }
+}
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 0.8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _block(62, 62, radius: 10),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+class _NoResults extends StatelessWidget {
+  const _NoResults({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const EmptyState(
+      icon: Icons.search_off_rounded,
+      title: 'No matches',
+      message: 'Try a different keyword or clear your search.',
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────
+/// Loading skeleton
+/// ─────────────────────────────────────────────
+class _PostSkeletonList extends StatelessWidget {
+  const _PostSkeletonList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.screen, AppSpacing.md,
+            AppSpacing.screen, AppSpacing.lg),
+        itemCount: 6,
+        itemBuilder: (_, __) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: AppCard(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _block(double.infinity, 14),
-                const SizedBox(height: 8),
-                _block(140, 11),
-                const SizedBox(height: 12),
-                _block(90, 20, radius: 6),
+              children: const [
+                SkeletonBox(width: 66, height: 66, radius: AppRadius.md),
+                SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBox(height: 14),
+                      SizedBox(height: AppSpacing.sm),
+                      SkeletonBox(width: 140, height: 11),
+                      SizedBox(height: AppSpacing.md),
+                      SkeletonBox(width: 90, height: 20, radius: AppRadius.xs),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
+/// ─────────────────────────────────────────────
+/// Add-post bottom sheet body
+/// ─────────────────────────────────────────────
 class _AddPostSheet extends StatefulWidget {
   const _AddPostSheet({required this.controller, this.initialText});
 
@@ -517,19 +477,16 @@ class _AddPostSheet extends StatefulWidget {
 
 class _AddPostSheetState extends State<_AddPostSheet> {
   final _urlController = TextEditingController();
+  final _collectionsController = CollectionsController();
 
   Metadata? _preview;
   bool _isLoading = false;
   bool _isSaving = false;
-
   String? _selectedCollectionId;
-
-  final _collectionsController = CollectionsController();
 
   @override
   void initState() {
     super.initState();
-
     if (widget.initialText != null) {
       _urlController.text = widget.initialText!;
       _fetchPreview(widget.initialText!);
@@ -550,17 +507,14 @@ class _AddPostSheetState extends State<_AddPostSheet> {
 
   Future<void> _fetchPreview(String url) async {
     if (url.length < 10) return;
-
     setState(() {
       _isLoading = true;
       _preview = null;
     });
-
     try {
       final data = await MetadataFetch.extract(url);
       if (mounted) setState(() => _preview = data);
     } catch (_) {}
-
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -569,256 +523,147 @@ class _AddPostSheetState extends State<_AddPostSheet> {
     if (url.isEmpty) return;
 
     setState(() => _isSaving = true);
-
     final success = await widget.controller.addPost(
       url,
-      collectionId: _selectedCollectionId, // 👈 PASS HERE
+      collectionId: _selectedCollectionId,
     );
-
-    setState(() => _isSaving = false);
+    if (mounted) setState(() => _isSaving = false);
 
     if (!success) {
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
       _showPaywall();
       return;
     }
-
     if (mounted) Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final borderColor = isDark ? AppColors.borderDark : AppColors.border;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 12,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+    return SingleChildScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-          /// Handle bar
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: borderColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-
-          Text('Save a link', style: Theme.of(context).textTheme.titleMedium),
-
-          const SizedBox(height: 16),
-
-          /// URL Input
-          TextField(
+          AppTextField(
             controller: _urlController,
             autofocus: true,
+            hint: 'Paste a link…',
+            icon: Icons.link_rounded,
             keyboardType: TextInputType.url,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimary,
-            ),
-            decoration: const InputDecoration(
-              hintText: 'Paste link...',
-              prefixIcon: Icon(Icons.link_rounded, size: 18),
-            ),
             onChanged: _fetchPreview,
           ),
 
-          /// Loading
-          if (_isLoading) ...[
-            const SizedBox(height: 20),
-            const _InlineShimmer(),
-          ],
-
-          /// Preview
-          if (_preview != null && !_isLoading) ...[
-            const SizedBox(height: 16),
-            PreviewCard(
-              preview: _preview!,
-              borderColor: borderColor,
-              isDark: isDark,
-            ),
-          ],
-
-          /// 🔥 COLLECTION SELECTOR (NEW)
-          const SizedBox(height: 16),
-
-          Text(
-            'Select a collection',
-            style: Theme.of(context).textTheme.labelMedium,
+          AnimatedSize(
+            duration: AppMotion.medium,
+            curve: AppMotion.standard,
+            alignment: Alignment.topCenter,
+            child: _buildPreviewArea(),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.xl),
 
           StreamBuilder<List<CollectionModel>>(
             stream: _collectionsController.getCollectionsStream(),
             builder: (context, snapshot) {
               final collections = snapshot.data ?? [];
-
               if (collections.isEmpty) return const SizedBox.shrink();
-
-              // 👇 Auto-select first collection (simple suggestion)
               _selectedCollectionId ??= collections.first.id;
 
-              return SizedBox(
-                height: 44,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: collections.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final col = collections[index];
-                    final isSelected =
-                        col.id == _selectedCollectionId;
-
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedCollectionId = col.id;
-                        });
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Add to collection',
+                      style: context.text.labelMedium),
+                  const SizedBox(height: AppSpacing.md),
+                  SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: collections.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(width: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        final col = collections[index];
+                        return AppChip(
+                          label: col.name,
+                          icon: Icons.folder_rounded,
+                          selected: col.id == _selectedCollectionId,
+                          onTap: () => setState(
+                              () => _selectedCollectionId = col.id),
+                        );
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primaryMuted
-                              : (isDark
-                              ? AppColors.surfaceVariantDark
-                              : AppColors.surfaceVariant),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.primary
-                                : borderColor,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.folder_rounded,
-                              size: 16,
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textTertiary,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              col.name,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelMedium
-                                  ?.copyWith(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               );
             },
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xxl),
 
-          /// Save Button
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isSaving ? null : _save,
-              child: _isSaving
-                  ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-                  : const Text('Save'),
-            ),
+          AppButton(
+            label: 'Save link',
+            icon: Icons.check_rounded,
+            loading: _isSaving,
+            onPressed: _save,
           ),
         ],
       ),
     );
   }
+
+  Widget _buildPreviewArea() {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.only(top: AppSpacing.lg),
+        child: Shimmer(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBox(width: 56, height: 56, radius: AppRadius.sm),
+              SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBox(height: 13),
+                    SizedBox(height: AppSpacing.sm),
+                    SkeletonBox(width: 160, height: 11),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_preview != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.lg),
+        child: _PreviewCard(preview: _preview!),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
 }
 
-class PreviewCard extends StatelessWidget {
-  const PreviewCard({
-    required this.preview,
-    required this.borderColor,
-    required this.isDark,
-  });
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({required this.preview});
 
   final Metadata preview;
-  final Color borderColor;
-  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceVariantDark : AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor, width: 0.8),
-      ),
+    return AppCard(
+      color: context.c.surfaceVariant,
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (preview.image != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                preview.image!,
-                width: 56,
-                height: 56,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
-            )
-          else
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: borderColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.link_rounded,
-                size: 20,
-                color: AppColors.textTertiary,
-              ),
-            ),
-
-          const SizedBox(width: 12),
-
+          Thumbnail(image: preview.image, size: 56, radius: AppRadius.sm),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -827,7 +672,7 @@ class PreviewCard extends StatelessWidget {
                   preview.title ?? 'No title',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: context.text.titleSmall,
                 ),
                 if (preview.description != null &&
                     preview.description!.isNotEmpty) ...[
@@ -836,7 +681,7 @@ class PreviewCard extends StatelessWidget {
                     preview.description!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: context.text.bodySmall,
                   ),
                 ],
               ],
@@ -844,88 +689,6 @@ class PreviewCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _InlineShimmer extends StatefulWidget {
-  const _InlineShimmer();
-
-  @override
-  State<_InlineShimmer> createState() => _InlineShimmerState();
-}
-
-class _InlineShimmerState extends State<_InlineShimmer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat(reverse: true);
-    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark
-        ? AppColors.surfaceVariantDark
-        : AppColors.surfaceVariant;
-    final hi = isDark ? AppColors.borderDark : AppColors.border;
-
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, __) {
-        final shimmer = Color.lerp(base, hi, _anim.value)!;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: shimmer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 13,
-                    decoration: BoxDecoration(
-                      color: shimmer,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Container(
-                    width: 160,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: shimmer,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 }
