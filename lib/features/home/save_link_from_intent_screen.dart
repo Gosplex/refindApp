@@ -5,6 +5,7 @@ import 'package:metadata_fetch/metadata_fetch.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_x.dart';
 import '../../core/widgets/widgets.dart';
+import '../auth/auth_controller.dart';
 import '../collection/collection_controller.dart';
 import '../collection/models/collection_model.dart';
 import '../saved_posts/saved_posts_controller.dart';
@@ -34,6 +35,14 @@ class _SaveLinkFromIntentScreenState extends State<SaveLinkFromIntentScreen> {
   void initState() {
     super.initState();
     _urlController.text = widget.sharedText;
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    // Eager anonymous sign-in was removed from launch; this is an explicit
+    // save action, so guarantee an account exists (guest is fine) first.
+    await AuthController().ensureSignedIn();
+    if (!mounted) return;
     _fetchPreview(widget.sharedText);
   }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,7 @@ import '../../core/theme/colors.dart';
 import '../../services/app_version_service.dart';
 import '../appUpdate/app_update_screen.dart';
 import '../auth/auth_controller.dart';
+import '../onboarding/welcome_screen.dart';
 import '../settings/settings_controller.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -137,8 +139,18 @@ class _SplashScreenState extends State<SplashScreen>
     final settingsController = SettingsController();
 
     try {
+      // Do NOT create an anonymous account eagerly. If there's no persisted
+      // session, show the welcome gate so returning users can sign back into
+      // their real account instead of spawning a throwaway anon.
+      final hasSession = await authController.bootstrapExistingSession();
+      if (!mounted) return;
+
+      if (!hasSession) {
+        _goToWelcome();
+        return;
+      }
+
       await Future.wait([
-        authController.initAuth(),
         settingsController.loadSettings(),
         AppVersionService().init(),
       ]);
@@ -183,11 +195,28 @@ class _SplashScreenState extends State<SplashScreen>
     } catch (e) {
       debugPrint("Splash init error: $e");
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => BottomNav()),
-      );
+      // If a session exists, fail open into the app; otherwise show the gate.
+      if (FirebaseAuth.instance.currentUser != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => BottomNav()),
+        );
+      } else {
+        _goToWelcome();
+      }
     }
+  }
+
+  void _goToWelcome() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 500),
+        pageBuilder: (_, __, ___) => const WelcomeScreen(),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
   }
 
   // ─────────────────────────────────────────────

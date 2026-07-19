@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../../core/model/app_user_model.dart';
@@ -11,29 +12,69 @@ import 'auth_service.dart';
 class AuthController {
   final AuthService _authService = AuthService();
 
-  Future<void> initAuth() async {
-    try {
-      User? user = _authService.currentUser;
+  /// Full one-time setup for whichever user is now signed in: creates/updates
+  /// the user doc, seeds default collections, configures RevenueCat, and links
+  /// the RC identity for non-anonymous users.
+  Future<void> _setupForUser(User user) async {
+    await _createOrUpdateUser(user);
+    await CollectionsController().seedDefaults();
+    await InAppPurchaseService().configureRevenueCat(user.uid);
+    await InAppPurchaseService().fetchCustomerInfo();
 
-      user ??= await _authService.signInAnonymously();
-
-      if (user == null) throw Exception("Failed to sign in anonymously");
-
-      await _createOrUpdateUser(user);
-
-      await CollectionsController().seedDefaults();
-
-      await InAppPurchaseService().configureRevenueCat(user.uid);
-
-      await InAppPurchaseService().fetchCustomerInfo();
-
-      if (!user.isAnonymous) {
+    if (!user.isAnonymous) {
+      try {
         final loginResult = await Purchases.logIn(user.uid);
-        print("RevenueCat logged in with: ${loginResult.customerInfo.originalAppUserId}");
+        debugPrint(
+            "RevenueCat logged in: ${loginResult.customerInfo.originalAppUserId}");
+      } catch (e) {
+        debugPrint("RevenueCat logIn error: $e");
       }
-    } catch (e) {
-      print("AuthController init error: $e");
     }
+  }
+
+  /// Splash entry point. If a session is already persisted, set it up and
+  /// return true. Returns false when signed out — the caller then shows the
+  /// welcome gate instead of silently minting a throwaway anonymous account.
+  Future<bool> bootstrapExistingSession() async {
+    final user = _authService.currentUser;
+    if (user == null) return false;
+    try {
+      await _setupForUser(user);
+    } catch (e) {
+      debugPrint("bootstrapExistingSession error: $e");
+    }
+    return true;
+  }
+
+  /// Welcome gate — "Continue without an account".
+  Future<bool> continueAsGuest() async {
+    try {
+      final user = await _authService.signInAnonymously();
+      if (user == null) return false;
+      await _setupForUser(user);
+      return true;
+    } catch (e) {
+      debugPrint("continueAsGuest error: $e");
+      return false;
+    }
+  }
+
+  /// Welcome gate — "Continue with Google". Returns the user on success, or
+  /// null if the user cancelled / it failed.
+  Future<User?> signInWithGoogleForOnboarding() async {
+    final credential = await _authService.signInWithGoogle();
+    if (credential == null || _authService.currentUser == null) return null;
+
+    await _authService.ensureDisplayName();
+    await _setupForUser(_authService.currentUser!);
+    return _authService.currentUser;
+  }
+
+  /// Guarantees SOME account exists before an explicit save action (the
+  /// share-to-save flow). Creates an anonymous guest if signed out.
+  Future<bool> ensureSignedIn() async {
+    if (_authService.currentUser != null) return true;
+    return continueAsGuest();
   }
 
   // Call this when user upgrades from anonymous → Google
@@ -43,11 +84,12 @@ class AuthController {
 
     try {
       final loginResult = await Purchases.logIn(user.uid);
-      print("RevenueCat linked: ${loginResult.customerInfo.originalAppUserId}");
+      debugPrint(
+          "RevenueCat linked: ${loginResult.customerInfo.originalAppUserId}");
       await InAppPurchaseService().fetchCustomerInfo();
       await _createOrUpdateUser(user);
     } catch (e) {
-      print("RevenueCat login after Google: $e");
+      debugPrint("RevenueCat login after Google: $e");
     }
   }
 
