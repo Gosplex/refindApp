@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:refind_app/features/subscription/subscription_screen.dart';
 import 'package:refind_app/services/app_version_service.dart';
+
+import '../../core/theme/app_spacing.dart';
 import '../../core/theme/colors.dart';
+import '../../core/theme/theme_x.dart';
+import '../../core/widgets/widgets.dart';
 import '../../main.dart';
 import '../../services/in_app_purchase_service.dart';
 import '../auth/auth_controller.dart';
@@ -24,15 +28,12 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final SettingsController controller = SettingsController();
-
   final auth = AuthService();
 
-  // ── auth / subscription state ──────────────────────────────────────────────
   StreamSubscription? _sub;
   bool isSubscribed = false;
   bool _isSigningIn = false;
 
-  // ── settings state ─────────────────────────────────────────────────────────
   bool isLoading = true;
   bool notificationsEnabled = true;
   bool weekRecapEnabled = false;
@@ -50,10 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     _sub = InAppPurchaseService().proStatusStream.listen((isPro) {
       if (!mounted) return;
-
-      setState(() {
-        isSubscribed = isPro;
-      });
+      setState(() => isSubscribed = isPro);
     });
   }
 
@@ -66,22 +64,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     await controller.loadSettings();
     final s = controller.settings!;
+    if (!mounted) return;
     setState(() {
       notificationsEnabled = s.notificationsEnabled;
       weekRecapEnabled = s.weekRecapEnabled;
       defaultReminder = s.defaultReminder;
       stopAfter = s.stopAfter;
       theme = s.theme;
-      quietStart = TimeOfDay(
-        hour: s.quietStartHour,
-        minute: s.quietStartMinute,
-      );
+      quietStart = TimeOfDay(hour: s.quietStartHour, minute: s.quietStartMinute);
       quietEnd = TimeOfDay(hour: s.quietEndHour, minute: s.quietEndMinute);
       isLoading = false;
     });
   }
 
-  Future<void> _saveSettings() async {
+  Future<void> _saveSettings({bool toast = true}) async {
     await controller.updateSettings(
       UserSettings(
         notificationsEnabled: notificationsEnabled,
@@ -95,9 +91,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         quietEndMinute: quietEnd.minute,
       ),
     );
+    if (toast) _toast('Saved');
+  }
 
+  void _toast(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Saved ✅"), showCloseIcon: true),
+      SnackBar(content: Text(message), showCloseIcon: true),
+    );
+  }
+
+  void _openPaywall() {
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
     );
   }
 
@@ -112,168 +119,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // ── Google sign-in stub ────────────────────────────────────────────────────
   Future<void> _signInWithGoogle() async {
     HapticFeedback.lightImpact();
-
     setState(() => _isSigningIn = true);
 
     try {
       final result = await auth.signInWithGoogle();
-
       final user = result?.user;
-
       if (user != null) {
         AuthController().onGoogleSignInComplete();
       }
 
       if (!mounted) return;
-
       setState(() => _isSigningIn = false);
-
       if (result == null) return;
 
       await auth.ensureDisplayName();
-
       final name = auth.currentUser?.displayName ?? "User";
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Welcome $name"), showCloseIcon: true),
-      );
-
-      setState(() {});
+      _toast('Welcome $name');
+      if (mounted) setState(() {});
     } catch (e) {
       if (!mounted) return;
-
       setState(() => _isSigningIn = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Sign-in failed"), showCloseIcon: true),
-      );
+      _toast('Sign-in failed');
     }
   }
 
   Future<void> _showDeleteAccountDialog() async {
-    HapticFeedback.lightImpact();
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(
-          'Delete account?',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        content: Text(
-          'This will permanently delete your account, collections, and all saved links.\n\nThis cannot be undone.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Delete',
-              style: TextStyle(
-                color: AppColors.error,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      icon: Icons.person_remove_rounded,
+      title: 'Delete account?',
+      message:
+          'This permanently deletes your account, collections and all saved links. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
     );
-
-    if (confirm != true) return;
+    if (!confirm) return;
 
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Deleting account...")),
-      );
-
-      await AuthController().deleteAccount(); // 👈 we’ll create this
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Account deleted"),
-          showCloseIcon: true,
-        ),
-      );
-
+      _toast('Deleting account…');
+      await AuthController().deleteAccount();
+      _toast('Account deleted');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Failed to delete account"),
-          showCloseIcon: true,
-        ),
-      );
+      _toast('Failed to delete account');
     }
   }
 
-  // ── clear dialog ───────────────────────────────────────────────────────────
-  void _showClearDialog() {
-    HapticFeedback.lightImpact();
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(
-          'Clear All Data',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        content: Text(
+  Future<void> _showClearDialog() async {
+    final confirm = await showConfirmDialog(
+      context,
+      icon: Icons.delete_sweep_rounded,
+      title: 'Clear all saved posts?',
+      message:
           'All saved posts will be permanently deleted. This cannot be undone.',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-
-              try {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Clearing posts...")),
-                );
-
-                await _postsController.deleteAllPosts();
-
-                if (!mounted) return;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("All posts deleted"),
-                    showCloseIcon: true,
-                  ),
-                );
-              } catch (e) {
-                if (!mounted) return;
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Failed to delete posts"),
-                    showCloseIcon: true,
-                  ),
-                );
-              }
-            },
-            child: Text(
-              'Delete',
-              style: TextStyle(
-                color: AppColors.error,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: 'Delete',
+      destructive: true,
     );
+    if (!confirm) return;
+
+    try {
+      _toast('Clearing posts…');
+      await _postsController.deleteAllPosts();
+      _toast('All posts deleted');
+    } catch (e) {
+      _toast('Failed to delete posts');
+    }
   }
 
   @override
@@ -289,399 +200,248 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.c;
 
     return Stack(
       children: [
         Scaffold(
           appBar: AppBar(
-            title: Text(
-              'Settings',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            titleSpacing: AppSpacing.screen,
+            title: Text('Settings', style: context.text.titleLarge),
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screen, AppSpacing.md, AppSpacing.screen, 110),
             children: [
-              // ── Account card ─────────────────────────────────────────────────
-              _AccountCard(
-                isDark: isDark,
-                isSubscribed: isSubscribed,
-                onSignIn: _signInWithGoogle,
-                isAnonymous: auth.isAnonymous(),
-                name: auth.displayName,
-                email: auth.email,
+              FadeSlideIn(
+                child: _AccountCard(
+                  isSubscribed: isSubscribed,
+                  isAnonymous: auth.isAnonymous(),
+                  name: auth.displayName,
+                  email: auth.email,
+                  onSignIn: _signInWithGoogle,
+                  onUpgrade: _openPaywall,
+                ),
               ),
+              const SizedBox(height: AppSpacing.xxl),
 
-              const SizedBox(height: 24),
-
-              // ── Notifications ─────────────────────────────────────────────────
-              _SectionLabel(label: 'Notifications'),
-              _SettingsCard(
-                isDark: isDark,
-                children: [
-                  _SwitchRow(
-                    title: 'Enable Notifications',
-                    value: notificationsEnabled,
-                    isDark: isDark,
-                    onChanged: (val) async {
-                      HapticFeedback.selectionClick();
-                      setState(() => notificationsEnabled = val);
-                      await _saveSettings();
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Stack(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.surfaceDark : AppColors.surface,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark ? AppColors.borderDark : AppColors.border,
-                          width: 0.8,
-                        ),
-                      ),
-                      child: _SwitchRow(
-                        title: 'Weekly Recap',
-                        value: weekRecapEnabled,
-                        isDark: isDark,
+              // Notifications
+              FadeSlideIn(
+                index: 1,
+                child: _Section(
+                  label: 'Notifications',
+                  child: _SettingsGroup(
+                    children: [
+                      _SwitchTile(
+                        title: 'Enable notifications',
+                        value: notificationsEnabled,
                         onChanged: (val) async {
-                          if (!isSubscribed) return;
-
+                          HapticFeedback.selectionClick();
+                          setState(() => notificationsEnabled = val);
+                          await _saveSettings();
+                        },
+                      ),
+                      _SwitchTile(
+                        title: 'Weekly recap',
+                        subtitle: 'A summary of your week',
+                        value: weekRecapEnabled,
+                        locked: !isSubscribed,
+                        onLockedTap: _openPaywall,
+                        onChanged: (val) async {
                           HapticFeedback.selectionClick();
                           setState(() => weekRecapEnabled = val);
                           await _saveSettings();
                         },
                       ),
-                    ),
-
-                    if (!isSubscribed)
-                      Positioned.fill(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SubscriptionScreen(),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              color: (isDark
-                                  ? AppColors.surfaceDark
-                                  : AppColors.surface)
-                                  .withOpacity(0.88),
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              child: Row(
-                                children: [
-                                  const Spacer(),
-
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryMuted,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.lock_rounded,
-                                          size: 12,
-                                          color: AppColors.primary,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'Premium',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall
-                                              ?.copyWith(color: AppColors.primary),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
+              const SizedBox(height: AppSpacing.xl),
 
-              const SizedBox(height: 20),
-
-              // ── Reminders ────────────────────────────────────────────────────
-              _SectionLabel(label: 'Reminder Settings'),
-              Stack(
-                children: [
-                  _SettingsCard(
-                    isDark: isDark,
+              // Reminders (pro)
+              FadeSlideIn(
+                index: 2,
+                child: _Section(
+                  label: 'Reminder settings',
+                  child: _LockableGroup(
+                    locked: !isSubscribed,
+                    onLockedTap: _openPaywall,
                     children: [
-                      _DropdownRow(
-                        title: 'Default Reminder',
+                      _DropdownTile(
+                        title: 'Default reminder',
                         value: defaultReminder,
-                        isDark: isDark,
-                        items: ['2 hours', '6 hours', '1 day'],
-                        onChanged: (_) {},
+                        items: const ['2 hours', '6 hours', '1 day'],
+                        onChanged: (val) async {
+                          if (val == null) return;
+                          setState(() => defaultReminder = val);
+                          await _saveSettings();
+                        },
                       ),
-                      _Divider(isDark: isDark),
-                      _DropdownRow(
-                        title: 'Stop Reminding After',
+                      _DropdownTile(
+                        title: 'Stop reminding after',
                         value: stopAfter,
-                        isDark: isDark,
-                        items: ['1 day', '3 days', '7 days', 'Never'],
-                        onChanged: (_) {},
+                        items: const ['1 day', '3 days', '7 days', 'Never'],
+                        onChanged: (val) async {
+                          if (val == null) return;
+                          setState(() => stopAfter = val);
+                          await _saveSettings();
+                        },
                       ),
                     ],
                   ),
-                  if (!isSubscribed) _ProOverlay(isDark: isDark),
-                ],
+                ),
               ),
+              const SizedBox(height: AppSpacing.xl),
 
-              const SizedBox(height: 20),
-
-              // ── Quiet Hours ───────────────────────────────────────────────────
-              _SectionLabel(label: 'Quiet Hours'),
-              Stack(
-                children: [
-                  _SettingsCard(
-                    isDark: isDark,
+              // Quiet hours (pro)
+              FadeSlideIn(
+                index: 3,
+                child: _Section(
+                  label: 'Quiet hours',
+                  child: _LockableGroup(
+                    locked: !isSubscribed,
+                    onLockedTap: _openPaywall,
                     children: [
-                      _TimeRow(
-                        title: 'Start Time',
+                      _TimeTile(
+                        title: 'Start time',
                         time: quietStart,
-                        isDark: isDark,
-                        onTap: () {},
+                        onTap: () => _pickTime(true),
                       ),
-                      _Divider(isDark: isDark),
-                      _TimeRow(
-                        title: 'End Time',
+                      _TimeTile(
+                        title: 'End time',
                         time: quietEnd,
-                        isDark: isDark,
-                        onTap: () {},
+                        onTap: () => _pickTime(false),
                       ),
                     ],
                   ),
-                  if (!isSubscribed) _ProOverlay(isDark: isDark),
-                ],
+                ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
 
-              // ── Appearance ────────────────────────────────────────────────────
-              _SectionLabel(label: 'Appearance'),
-              _SettingsCard(
-                isDark: isDark,
-                children: [
-                  _DropdownRow(
-                    title: 'Theme',
-                    value: theme,
-                    isDark: isDark,
-                    items: ['System', 'Light', 'Dark'],
-                    onChanged: (val) async {
-                      setState(() => theme = val!);
-                      themeController.setTheme(val!);
-                      await _saveSettings();
-                    },
+              // Appearance
+              FadeSlideIn(
+                index: 4,
+                child: _Section(
+                  label: 'Appearance',
+                  child: _SettingsGroup(
+                    children: [
+                      _DropdownTile(
+                        title: 'Theme',
+                        value: theme,
+                        items: const ['System', 'Light', 'Dark'],
+                        onChanged: (val) async {
+                          if (val == null) return;
+                          setState(() => theme = val);
+                          themeController.setTheme(val);
+                          await _saveSettings();
+                        },
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
+              const SizedBox(height: AppSpacing.xl),
 
-              const SizedBox(height: 20),
-
-              // ── Danger Zone ───────────────────────────────────────────────────
-              _SectionLabel(label: 'Danger Zone'),
-              _SettingsCard(
-                isDark: isDark,
-                children: [
-                  _DangerRow(
-                    title: 'Clear All Saved Posts',
-                    onTap: _showClearDialog,
+              // Danger zone
+              FadeSlideIn(
+                index: 5,
+                child: _Section(
+                  label: 'Danger zone',
+                  child: _SettingsGroup(
+                    children: [
+                      _DangerTile(
+                        title: 'Clear all saved posts',
+                        icon: Icons.delete_sweep_rounded,
+                        onTap: _showClearDialog,
+                      ),
+                      if (!auth.isAnonymous())
+                        _DangerTile(
+                          title: 'Delete account',
+                          icon: Icons.person_remove_rounded,
+                          onTap: _showDeleteAccountDialog,
+                        ),
+                    ],
                   ),
-                  if (!auth.isAnonymous()) ...[
-                    _Divider(isDark: isDark),
-
-                    _DangerRow(
-                      title: 'Delete Account',
-                      onTap: _showDeleteAccountDialog,
-                    ),
-                  ],
-                ],
+                ),
               ),
+              const SizedBox(height: AppSpacing.xl),
 
-              const SizedBox(height: 20),
-
-              // ── About ─────────────────────────────────────────────────────────
-              _SectionLabel(label: 'About'),
-              _SettingsCard(
-                isDark: isDark,
-                children: [_AboutRow(isDark: isDark)],
-              ),
+              // About
+              FadeSlideIn(index: 6, child: const _AboutTile()),
             ],
           ),
         ),
         if (_isSigningIn)
           Container(
-            color: Colors.black.withOpacity(0.3),
-            child: const Center(child: CircularProgressIndicator()),
+            color: c.overlay,
+            child: const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
           ),
       ],
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🧩  Account Card
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ─────────────────────────────────────────────
+// Account card
+// ─────────────────────────────────────────────
 class _AccountCard extends StatelessWidget {
   const _AccountCard({
-    required this.isDark,
     required this.isSubscribed,
-    required this.onSignIn,
     required this.isAnonymous,
+    required this.onSignIn,
+    required this.onUpgrade,
     this.name,
     this.email,
   });
 
-  final bool isDark;
   final bool isSubscribed;
-  final VoidCallback onSignIn;
   final bool isAnonymous;
+  final VoidCallback onSignIn;
+  final VoidCallback onUpgrade;
   final String? name;
   final String? email;
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-    final badgeBg = isSubscribed
-        ? AppColors.primaryMuted
-        : (isDark ? AppColors.surfaceVariantDark : AppColors.surfaceVariant);
-    final badgeFg = isSubscribed ? AppColors.primary : AppColors.textTertiary;
-    final mutedBg = isDark
-        ? AppColors.surfaceVariantDark
-        : AppColors.surfaceVariant;
+    final c = context.c;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border, width: 0.8),
-      ),
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row — title + plan badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Account', style: Theme.of(context).textTheme.titleSmall),
+              Text('Account', style: context.text.titleSmall),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
+                    horizontal: AppSpacing.md, vertical: 4),
                 decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(6),
+                  color: isSubscribed ? c.primarySurface : c.surfaceVariant,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
                   isSubscribed ? 'PREMIUM' : 'FREE',
                   style: TextStyle(
                     fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: badgeFg,
+                    fontWeight: FontWeight.w700,
+                    color: isSubscribed ? c.primary : c.textTertiary,
                     letterSpacing: 0.6,
                   ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Identity row — changes based on auth state
+          const SizedBox(height: AppSpacing.lg),
           isAnonymous
-              ? _SignInButton(
-                  isDark: isDark,
-                  border: border,
-                  mutedBg: mutedBg,
-                  onTap: onSignIn,
-                )
-              : _SignedInRow(
-                  isDark: isDark,
-                  border: border,
-                  mutedBg: mutedBg,
-                  name: name,
-                  email: email,
-                  onTap: onSignIn,
-                ),
-
-          // Upgrade button — only for free users
+              ? _SignInButton(onTap: onSignIn)
+              : _SignedInRow(name: name, email: email),
           if (!isSubscribed) ...[
-            const SizedBox(height: 12),
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-                );
-              },
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 13,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryMuted,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.primaryLight, width: 0.8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Upgrade to Premium',
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(color: AppColors.primary),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Unlimited bookmarks & smart reminders',
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(color: AppColors.primaryLight),
-                        ),
-                      ],
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: AppColors.primary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            const SizedBox(height: AppSpacing.md),
+            _UpgradeBanner(onTap: onUpgrade),
           ],
         ],
       ),
@@ -689,49 +449,86 @@ class _AccountCard extends StatelessWidget {
   }
 }
 
-// Anonymous state — show Google sign-in button
-class _SignInButton extends StatelessWidget {
-  const _SignInButton({
-    required this.isDark,
-    required this.border,
-    required this.mutedBg,
-    required this.onTap,
-  });
+class _UpgradeBanner extends StatelessWidget {
+  const _UpgradeBanner({required this.onTap});
 
-  final bool isDark;
-  final Color border;
-  final Color mutedBg;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md + 1),
         decoration: BoxDecoration(
-          color: mutedBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: border, width: 0.8),
+          gradient: const LinearGradient(
+            colors: [AppColors.primary, Color(0xFF5A8C69)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppRadius.md),
         ),
         child: Row(
           children: [
-            _GoogleMark(),
-            const SizedBox(width: 12),
+            const Icon(Icons.auto_awesome_rounded,
+                color: Colors.white, size: 20),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Sign in with Google',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
+                  Text('Upgrade to Premium',
+                      style: context.text.titleSmall
+                          ?.copyWith(color: Colors.white)),
                   const SizedBox(height: 2),
-                  Text(
-                    'Sync bookmarks across all your devices',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
+                  Text('Unlimited bookmarks & smart reminders',
+                      style: context.text.labelSmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.85))),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                size: 14, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SignInButton extends StatelessWidget {
+  const _SignInButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return PressableScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        decoration: BoxDecoration(
+          color: c.surfaceVariant,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: c.border, width: 0.8),
+        ),
+        child: Row(
+          children: [
+            _GoogleMark(),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sign in with Google',
+                      style: context.text.titleSmall),
+                  const SizedBox(height: 2),
+                  Text('Sync bookmarks across all your devices',
+                      style: context.text.labelSmall),
                 ],
               ),
             ),
@@ -742,21 +539,9 @@ class _SignInButton extends StatelessWidget {
   }
 }
 
-// Signed-in state — avatar + name + email + switch account option
 class _SignedInRow extends StatelessWidget {
-  const _SignedInRow({
-    required this.isDark,
-    required this.border,
-    required this.mutedBg,
-    required this.onTap,
-    this.name,
-    this.email,
-  });
+  const _SignedInRow({this.name, this.email});
 
-  final bool isDark;
-  final Color border;
-  final Color mutedBg;
-  final VoidCallback onTap;
   final String? name;
   final String? email;
 
@@ -770,79 +555,72 @@ class _SignedInRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.c;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: mutedBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border, width: 0.8),
+        color: c.surfaceVariant,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: c.border, width: 0.8),
       ),
       child: Row(
         children: [
-          // Avatar circle with initials
           Container(
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primaryMuted,
-              borderRadius: BorderRadius.circular(12),
+              color: c.primarySurface,
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
             child: Center(
               child: Text(
                 _initials,
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.primary,
                   height: 1,
                 ),
               ),
             ),
           ),
-
-          const SizedBox(width: 12),
-
-          // Name + email
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name ?? 'Your account',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                if (email != null && email!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    email!,
+                Text(name ?? 'Your account',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
+                    style: context.text.titleSmall),
+                if (email != null && email!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(email!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.text.labelSmall),
                 ],
               ],
             ),
           ),
-
-          const SizedBox(width: 8),
+          Icon(Icons.verified_rounded, size: 18, color: c.primary),
         ],
       ),
     );
   }
 }
 
-/// Minimal Google "G" mark drawn with plain Flutter widgets — no asset needed.
+/// Minimal Google "G" mark — no asset needed.
 class _GoogleMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34,
-      height: 34,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         boxShadow: [
           BoxShadow(
             color: AppColors.shadow,
@@ -855,7 +633,7 @@ class _GoogleMark extends StatelessWidget {
         child: Text(
           'G',
           style: TextStyle(
-            fontSize: 17,
+            fontSize: 18,
             fontWeight: FontWeight.w700,
             color: Color(0xFF4285F4),
             height: 1,
@@ -866,157 +644,249 @@ class _GoogleMark extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🧩  Section label
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
+// ─────────────────────────────────────────────
+// Section scaffolding
+// ─────────────────────────────────────────────
+class _Section extends StatelessWidget {
+  const _Section({required this.label, required this.child});
 
   final String label;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.labelMedium?.copyWith(letterSpacing: 0.4),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+              left: AppSpacing.xs, bottom: AppSpacing.sm),
+          child: Text(
+            label.toUpperCase(),
+            style: context.text.labelSmall?.copyWith(
+              letterSpacing: 0.8,
+              fontWeight: FontWeight.w600,
+              color: context.c.textTertiary,
+            ),
+          ),
+        ),
+        child,
+      ],
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🧩  Shared card wrapper
-// ─────────────────────────────────────────────────────────────────────────────
+/// A card grouping rows, auto-inserting hairline dividers between them.
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
 
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.isDark, required this.children});
-
-  final bool isDark;
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    final bg = isDark ? AppColors.surfaceDark : AppColors.surface;
-    final border = isDark ? AppColors.borderDark : AppColors.border;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border, width: 0.8),
-      ),
-      child: Column(children: children),
+    final c = context.c;
+    final rows = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      rows.add(children[i]);
+      if (i != children.length - 1) {
+        rows.add(Divider(
+            height: 1,
+            thickness: 0.8,
+            indent: AppSpacing.lg,
+            endIndent: AppSpacing.lg,
+            color: c.border));
+      }
+    }
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(children: rows),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🧩  Row atoms
-// ─────────────────────────────────────────────────────────────────────────────
+/// A settings group that dims + locks behind a premium overlay when [locked].
+class _LockableGroup extends StatelessWidget {
+  const _LockableGroup({
+    required this.children,
+    required this.locked,
+    required this.onLockedTap,
+  });
 
-class _Divider extends StatelessWidget {
-  const _Divider({required this.isDark});
-
-  final bool isDark;
+  final List<Widget> children;
+  final bool locked;
+  final VoidCallback onLockedTap;
 
   @override
   Widget build(BuildContext context) {
-    return Divider(
-      height: 0,
-      thickness: 0.8,
-      color: isDark ? AppColors.borderDark : AppColors.border,
-      indent: 16,
-      endIndent: 16,
+    final group = _SettingsGroup(children: children);
+    if (!locked) return group;
+
+    final c = context.c;
+    return Stack(
+      children: [
+        group,
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onLockedTap,
+            child: Container(
+              decoration: BoxDecoration(
+                color: c.surface.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
+              alignment: Alignment.center,
+              child: const _PremiumChip(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _SwitchRow extends StatelessWidget {
-  const _SwitchRow({
+class _PremiumChip extends StatelessWidget {
+  const _PremiumChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 7),
+      decoration: BoxDecoration(
+        color: c.primarySurface,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_rounded, size: 13, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.xs + 2),
+          Text('Premium feature',
+              style: context.text.labelMedium
+                  ?.copyWith(color: c.primary, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Row atoms
+// ─────────────────────────────────────────────
+class _SwitchTile extends StatelessWidget {
+  const _SwitchTile({
     required this.title,
     required this.value,
-    required this.isDark,
     required this.onChanged,
+    this.subtitle,
+    this.locked = false,
+    this.onLockedTap,
   });
 
   final String title;
+  final String? subtitle;
   final bool value;
-  final bool isDark;
   final ValueChanged<bool> onChanged;
+  final bool locked;
+  final VoidCallback? onLockedTap;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      // Transparent Material so the ListTile has a Material ancestor to paint
-      // its ink/selection on, while the section card's background still shows.
-      child: Material(
-        type: MaterialType.transparency,
-        child: SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(title, style: Theme.of(context).textTheme.bodyLarge),
-          value: value,
-          onChanged: onChanged,
-        ),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: context.text.bodyLarge),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(subtitle!, style: context.text.labelSmall),
+                ],
+              ],
+            ),
+          ),
+          if (locked)
+            GestureDetector(
+              onTap: onLockedTap,
+              child: const _MiniLock(),
+            )
+          else
+            Switch(value: value, onChanged: onChanged),
+        ],
       ),
     );
   }
 }
 
-class _DropdownRow extends StatelessWidget {
-  const _DropdownRow({
+class _MiniLock extends StatelessWidget {
+  const _MiniLock();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Container(
+      padding:
+          const EdgeInsets.symmetric(horizontal: AppSpacing.sm + 2, vertical: 6),
+      decoration: BoxDecoration(
+        color: c.primarySurface,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.lock_rounded, size: 12, color: AppColors.primary),
+          const SizedBox(width: 4),
+          Text('Premium',
+              style: context.text.labelSmall?.copyWith(color: c.primary)),
+        ],
+      ),
+    );
+  }
+}
+
+class _DropdownTile extends StatelessWidget {
+  const _DropdownTile({
     required this.title,
     required this.value,
-    required this.isDark,
     required this.items,
     required this.onChanged,
   });
 
   final String title;
   final String value;
-  final bool isDark;
   final List<String> items;
   final ValueChanged<String?> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final textColor = isDark
-        ? AppColors.textPrimaryDark
-        : AppColors.textPrimary;
-
+    final c = context.c;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: Theme.of(context).textTheme.bodyLarge),
+          Text(title, style: context.text.bodyLarge),
           DropdownButton<String>(
             value: value,
             underline: const SizedBox(),
-            dropdownColor: isDark ? AppColors.surfaceDark : AppColors.surface,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppColors.primary),
-            icon: Icon(
-              Icons.expand_more_rounded,
-              size: 18,
-              color: AppColors.textTertiary,
-            ),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            dropdownColor: c.surface,
+            style: context.text.bodyMedium?.copyWith(color: c.primary),
+            icon: Icon(Icons.expand_more_rounded,
+                size: 18, color: c.textTertiary),
             items: items
-                .map(
-                  (e) => DropdownMenuItem(
-                    value: e,
-                    child: Text(
-                      e,
-                      style: TextStyle(color: textColor, fontSize: 14),
-                    ),
-                  ),
-                )
+                .map((e) => DropdownMenuItem(
+                      value: e,
+                      child: Text(e,
+                          style: TextStyle(color: c.textPrimary, fontSize: 14)),
+                    ))
                 .toList(),
             onChanged: onChanged,
           ),
@@ -1026,35 +896,42 @@ class _DropdownRow extends StatelessWidget {
   }
 }
 
-class _TimeRow extends StatelessWidget {
-  const _TimeRow({
+class _TimeTile extends StatelessWidget {
+  const _TimeTile({
     required this.title,
     required this.time,
-    required this.isDark,
     required this.onTap,
   });
 
   final String title;
   final TimeOfDay time;
-  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final c = context.c;
+    return PressableScale(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      pressedScale: 0.98,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md + 2),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(title, style: Theme.of(context).textTheme.bodyLarge),
-            Text(
-              time.format(context),
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: AppColors.primary),
+            Text(title, style: context.text.bodyLarge),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: 5),
+              decoration: BoxDecoration(
+                color: c.primarySurface,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Text(
+                time.format(context),
+                style: context.text.labelMedium
+                    ?.copyWith(color: c.primary, fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         ),
@@ -1063,33 +940,36 @@ class _TimeRow extends StatelessWidget {
   }
 }
 
-class _DangerRow extends StatelessWidget {
-  const _DangerRow({required this.title, required this.onTap});
+class _DangerTile extends StatelessWidget {
+  const _DangerTile({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
 
   final String title;
+  final IconData icon;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final c = context.c;
+    return PressableScale(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      pressedScale: 0.98,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md + 2),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(color: AppColors.error),
+            Icon(icon, size: 19, color: c.error),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Text(title,
+                  style: context.text.bodyLarge?.copyWith(color: c.error)),
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: AppColors.error.withOpacity(0.6),
-            ),
+            Icon(Icons.chevron_right_rounded,
+                size: 18, color: c.error.withValues(alpha: 0.6)),
           ],
         ),
       ),
@@ -1097,98 +977,45 @@ class _DangerRow extends StatelessWidget {
   }
 }
 
-class _AboutRow extends StatelessWidget {
-  const _AboutRow({required this.isDark});
-
-  final bool isDark;
+class _AboutTile extends StatelessWidget {
+  const _AboutTile();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    final c = context.c;
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         children: [
-          // App icon placeholder
           Container(
-            width: 40,
-            height: 40,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: AppColors.primaryMuted,
-              borderRadius: BorderRadius.circular(10),
+              gradient: const LinearGradient(
+                colors: [AppColors.primary, Color(0xFF5A8C69)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            child: const Icon(
-              Icons.bookmark_rounded,
-              size: 20,
-              color: AppColors.primary,
-            ),
+            child: const Icon(Icons.bookmark_rounded,
+                size: 22, color: Colors.white),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Refind', style: Theme.of(context).textTheme.titleSmall),
+              Text('Refind', style: context.text.titleSmall),
               const SizedBox(height: 2),
               Text(
                 'Revisit what matters · v${AppVersionService().fullVersion}',
-                style: Theme.of(context).textTheme.labelSmall,
+                style: context.text.labelSmall,
               ),
             ],
           ),
+          const Spacer(),
+          Icon(Icons.favorite_rounded, size: 16, color: c.primary),
         ],
-      ),
-    );
-  }
-}
-
-class _ProOverlay extends StatelessWidget {
-  const _ProOverlay({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned.fill(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          HapticFeedback.lightImpact();
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
-          );
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: (isDark ? AppColors.surfaceDark : AppColors.surface)
-                .withOpacity(0.85),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryMuted,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.lock_rounded,
-                    size: 14,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Premium feature',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppColors.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
